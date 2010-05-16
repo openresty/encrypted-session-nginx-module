@@ -1,5 +1,5 @@
 Name
-    encrypted-session-nginx-module - more rewrite set commands
+    encrypted-session-nginx-module - encrypt and decrypt nginx variable values
 
     *This module is not distributed with the Nginx source.* See the
     installation instructions.
