@@ -51,17 +51,18 @@ Description
     This module can be used to implement simple user login and ACL.
 
 Directives
-  set_if_empty
+    encrypted_session_key
+        set the key for the cipher (must be 32 bytes long)
 
-  set_quote_sql_value
+    encrypted_session_iv
+        set the init vector used for the cipher (must be no longer than 16 bytes)
 
-  set_unescape_uri
+    encrypted_session_expires
+        set expiration time difference (in seconds)
 
-  set_hashed_upstream
+    set_encrypt_session
 
-  set_encode_base32
-
-  set_decode_base32
+    set_decrypt_session
 
 Installation
     1. Grab the nginx source code from nginx.net (<http://nginx.net/ >), for
