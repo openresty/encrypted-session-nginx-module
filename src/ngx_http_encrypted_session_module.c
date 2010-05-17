@@ -205,10 +205,6 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
     if (rc != NGX_OK) {
         dst = NULL;
         len = 0;
-
-        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                "encrypted_session: failed to decrypt");
-
     }
 
     res->data = dst;

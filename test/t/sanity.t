@@ -41,6 +41,7 @@ res = ktrp3n437q42laejppc9d4bg0jpv0ejie106ooo65od9lf5huhs0====
 b = abc
 
 
+
 === TEST 2: key with custom iv
 --- config
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
@@ -67,7 +68,7 @@ b = abc
 
 
 
-=== TEST 4: key with custom iv
+=== TEST 3: key with custom iv
 --- config
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
     #encrypted_session_key "abcdefghijklmnopqrstuvwx";
@@ -94,7 +95,7 @@ b = abc$
 
 
 
-=== TEST 5: key with custom iv
+=== TEST 4: key with custom iv
 --- config
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
     encrypted_session_iv "12345678";
@@ -113,7 +114,7 @@ b = abc$
 
 
 
-=== TEST 6: key with custom iv
+=== TEST 5: key with custom iv
 --- config
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
     encrypted_session_iv "12345678";
@@ -141,7 +142,9 @@ b = abc$
 1315
 
 
-=== TEST 6: decoder
+
+=== TEST 6: decoder (bad md5 checksum)
+valid: ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09l7a0rg10====
 --- config
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
     encrypted_session_iv "12345678";
@@ -151,31 +154,30 @@ b = abc$
         set_unescape_uri $session $arg__s;
         set_decode_base32 $session;
         set_decrypt_session $uid $session;
-        echo $uid;
+        echo '[$uid]';
     }
 --- request
-GET /decode?_s=l7qpsr2efv8s9ff38m05a9e7nnjurn5rpji425ut35ujlms4kti0====
---- response_body
-63446
---- SKIP
-
-
-=== TEST 5: failed to decrypt
---- config
-    encrypted_session_key "H?hXhmg]J!Q,RjESyt086/{U";
-    encrypted_session_iv ".LXQ/_x&";
-    encrypted_session_expires 1d;
-
-    location /encode {
-        set_unescape_uri $res $arg_s;
-        set_decode_base32 $res;
-        set_decrypt_session $res;
-
-        echo "[$res]";
-    }
---- request
-    GET /encode?s=q283n6kgt8s5ma67gf3r4tirfv26ihin430c4v7jghg09e0igm1g====
+GET /decode?_s=3trp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09l7a0rg10====
 --- response_body
 []
---- SKIP
+
+
+
+=== TEST 7: decoder (bad md5 checksum)
+valid: ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09l7a0rg10====
+--- config
+    encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
+    encrypted_session_iv "12345678";
+    encrypted_session_expires 1d;
+
+    location /decode {
+        set_unescape_uri $session $arg__s;
+        set_decode_base32 $session;
+        set_decrypt_session $uid $session;
+        echo '[$uid]';
+    }
+--- request
+GET /decode?_s=ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09laa0rg10====
+--- response_body
+[]
 

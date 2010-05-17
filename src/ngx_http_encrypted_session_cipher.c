@@ -179,7 +179,8 @@ ngx_http_encrypted_session_3des_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
     /* EVP_DecryptFinal clears ctx automatically */
     ret = EVP_DecryptFinal(&ctx, p, &len);
     if (! ret) {
-        dd("decrypt final failed");
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
+                "failed to decrypt session: bad AES-256 digest.");
 
         return NGX_ERROR;
     }
@@ -202,7 +203,8 @@ ngx_http_encrypted_session_3des_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
     MD5(*dst, *dst_len, new_digest);
 
     if (ngx_strncmp(digest, new_digest, MD5_DIGEST_LENGTH) != 0) {
-        dd("decrypt: digest mismatch");
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
+                "failed to decrypt session: MD5 checksum mismatch.");
 
         return NGX_ERROR;
     }
