@@ -90,11 +90,14 @@ ngx_http_encrypted_session_3des_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += len;
 
-    /* EVP_EncryptFinal clears ctx automatically */
     ret = EVP_EncryptFinal(&ctx, p, &len);
     if (! ret) {
         return NGX_ERROR;
     }
+
+    /* XXX we should still explicitly release the ctx
+     * or we'll leak memory here */
+    EVP_CIPHER_CTX_cleanup(&ctx);
 
     p += len;
 
@@ -176,8 +179,12 @@ ngx_http_encrypted_session_3des_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += len;
 
-    /* EVP_DecryptFinal clears ctx automatically */
     ret = EVP_DecryptFinal(&ctx, p, &len);
+
+    /* XXX we should still explicitly release the ctx
+     * or we'll leak memory here */
+    EVP_CIPHER_CTX_cleanup(&ctx);
+
     if (! ret) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
                 "failed to decrypt session: bad AES-256 digest.");
