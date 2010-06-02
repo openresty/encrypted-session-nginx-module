@@ -446,12 +446,13 @@ start_nginx:
 
             if ($UseValgrind) {
                 if (-f 'valgrind.suppress') {
-                    $cmd = "valgrind --leak-check=full --gen-suppressions=all --suppressions=valgrind.suppress $cmd";
+                    $cmd = "valgrind -q --leak-check=full --gen-suppressions=all --suppressions=valgrind.suppress $cmd";
                 } else {
-                    $cmd = "valgrind --leak-check=full --gen-suppressions=all $cmd";
+                    $cmd = "valgrind -q --leak-check=full --gen-suppressions=all $cmd";
                 }
 
-                warn $cmd;
+                warn "$name\n";
+                #warn "$cmd\n";
             }
 
             if ($Profiling || $UseValgrind) {
@@ -473,7 +474,7 @@ start_nginx:
 =cut
 
                 }
-                warn "sleeping";
+                #warn "sleeping";
                 sleep 1;
             } else {
                 if (system($cmd) != 0) {
@@ -512,9 +513,9 @@ start_nginx:
     }
 
     if ($Profiling || $UseValgrind) {
-        warn "Found quit...";
+        #warn "Found quit...";
         if (-f $PidFile) {
-            warn "found pid file...";
+            #warn "found pid file...";
             my $pid = get_pid_from_pidfile($name);
             if (system("ps $pid > /dev/null") == 0) {
                 write_config_file($config, $block->http_config);
@@ -523,18 +524,18 @@ start_nginx:
                 }
                 sleep 0.1;
                 if (-f $PidFile) {
-                    warn "killing with force (valgrind or profile)...\n";
+                    #warn "killing with force (valgrind or profile)...\n";
                     kill(SIGKILL, $pid);
                     sleep 0.02;
                 } else {
-                    warn "nginx killed";
+                    #warn "nginx killed";
                 }
             } else {
                 unlink $PidFile or
                     die "Failed to remove pid file $PidFile\n";
             }
         } else {
-            warn "pid file not found";
+            #warn "pid file not found";
         }
     }
 }
