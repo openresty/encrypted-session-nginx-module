@@ -63,7 +63,7 @@ b = abc
 --- request
     GET /encode
 --- response_body
-res = ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09l7a0rg10====
+res = ktrp3n437q42laejppc9d4bg0hul4pmqhc8tn2laae40aakqfoh0====
 b = abc
 
 

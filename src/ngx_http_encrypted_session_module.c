@@ -262,11 +262,14 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     llcf->iv = ngx_pcalloc(cf->pool,
-            sizeof(ngx_http_encrypted_session_iv_length));
+            ngx_http_encrypted_session_iv_length);
 
     if (llcf->iv == NULL) {
         return NGX_CONF_ERROR;
     }
+
+    dd("XXX iv max len: %d", (int) ngx_http_encrypted_session_iv_length);
+    dd("XXX iv actual len: %d", (int) value[1].len);
 
     if (value[1].len) {
         ngx_memcpy(llcf->iv, value[1].data, value[1].len);
