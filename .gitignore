@@ -12,7 +12,7 @@ print.txt
 .rsync
 *.tar.gz
 dist
-build[78]
+build[789]
 build
 tags
 update-readme
@@ -50,3 +50,5 @@ util/bench
 src/cipher.c
 src/cipher.h
 pack.sh
+t/servroot/
+all.sh
