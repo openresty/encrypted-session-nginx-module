@@ -50,6 +50,24 @@ Description
 
     This module can be used to implement simple user login and ACL.
 
+    Usually, you just decrypt data in nginx level, and pass the uncrypted
+    data to your FastCGI/HTTP backend, as in
+
+       location /blah {
+              set_decrypt_session $raw_text $encrypted;
+
+             # this directive is from thengx_set_misc module
+              set_escape_uri $escaped_raw_text $raw_text;
+
+              fastcgi_param QUERY_STRING "uid=$uid";
+              fastcgi_pass unix:/path/to/my/php/or/python/fastcgi.sock;
+       }
+
+    Lua web apps running directly on ngx_lua can call
+    this module's directives directly from within Lua code:
+
+       local raw_text = ndk.set_var.set_decrypt_session(encrypted_text)
+
 Directives
     encrypted_session_key
         set the key for the cipher (must be 32 bytes long)
