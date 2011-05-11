@@ -20,7 +20,6 @@ update-readme
 test/Makefile
 test/blib
 test.sh
-t.sh
 t/t.sh
 test/t/servroot/
 releng
@@ -51,4 +50,6 @@ src/cipher.c
 src/cipher.h
 pack.sh
 t/servroot/
-all.sh
+all
+build10
+go
