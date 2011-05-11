@@ -12,15 +12,20 @@ rm -f ~/work/nginx-$version/objs/addon/ndk/ndk.o \
     ~/work/nginx-$version/objs/addon/ndk-nginx-module/ndk.o
 
 if [ ! -s "nginx-$version.tar.gz" ]; then
-    wget "http://sysoev.ru/nginx/nginx-$version.tar.gz" -O nginx-$version.tar.gz || exit 1
-    tar -xzvf nginx-$version.tar.gz || exit 1
-    if [ "$version" = "0.8.41" ]; then
-        cp $root/../no-pool-nginx/nginx-$version-no_pool.patch ./
-        patch -p0 < nginx-$version-no_pool.patch || exit 1
+    if [ -f ~/work/nginx-$version.tar.gz ]; then
+        cp ~/work/nginx-$version.tar.gz ./ || exit 1
+    else
+        wget "http://sysoev.ru/nginx/nginx-$version.tar.gz" -O nginx-$version.tar.gz || exit 1
     fi
+
+    tar -xzvf nginx-$version.tar.gz || exit 1
 fi
 
-cd nginx-$version/
+#tar -xzvf nginx-$version.tar.gz || exit 1
+#cp $root/../no-pool-nginx/nginx-$version-no_pool.patch ./ || exit 1
+#patch -p0 < nginx-$version-no_pool.patch || exit 1
+
+cd nginx-$version/ || exit 1
 if [[ "$BUILD_CLEAN" -eq 1 || ! -f Makefile || "$root/config" -nt Makefile || "$root/util/build.sh" -nt Makefile ]]; then
     ./configure --prefix=/opt/nginx \
             --without-mail_pop3_module \
