@@ -78,6 +78,23 @@ Directives
     encrypted_session_expires
         set expiration time difference (in seconds)
 
+        For example, consider the config
+
+            encypted_session_expires 1d;
+
+        When your session is being generated, ngx_encrypted_session will plant
+        an expiration time (1 day in the future in this example) into the the
+        encrypted session string, such that when the session is being decrypted
+        later, the server can pull the expiration time out of the session and
+        compare it with the server's current system time. No matter how you
+        transfer and store your session, like using cookies, or uri args, or whatever.
+
+        People may confuse this setting with the expiration date of http cookies.
+        This directive simply controls when the session gets expired; it knows
+        nothing about http cookies. Even if the end user intercepted this session
+        from cookie by himself and uses it later manually, the server will still
+        reject it when the expiration time gets passed.
+
     set_encrypt_session
 
     set_decrypt_session
