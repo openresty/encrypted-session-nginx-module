@@ -127,7 +127,9 @@ Installation
 Compatibility
     The following versions of Nginx should work with this module:
 
-    *   1.0.x (last tested: 1.0.5)
+    *   1.1.x (last tested: 1.1.5)
+
+    *   1.0.x (last tested: 1.0.8)
 
     *   0.9.x (last tested: 0.9.4)
 
