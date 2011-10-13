@@ -122,7 +122,7 @@ Installation
 
     Download the latest version of the release tarball of this module from
     encrypted-session-nginx-module file list
-    (<http://github.com/agentzh/encrypted-session-nginx-module/downloads >).
+    (<http://github.com/agentzh/encrypted-session-nginx-module/tags >).
 
 Compatibility
     The following versions of Nginx should work with this module:
