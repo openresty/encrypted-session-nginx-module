@@ -24,7 +24,7 @@ Synopsis
         set_encrypt_session $session $raw;
         set_encode_base32 $session; # from the ngx_set_misc module
 
-        add_header 'Set-Cookie: my_login=$session';  # from the ngx_headers module
+        add_header Set-Cookie 'my_login=$session';  # from the ngx_headers module
 
         # your content handler goes here...
     }
