@@ -24,13 +24,13 @@ Synopsis
         set_encrypt_session $session $raw;
         set_encode_base32 $session; # from the ngx_set_misc module
 
-        add_header 'Set-Cookie: my-login=$session';  # from the ngx_headers module
+        add_header 'Set-Cookie: my_login=$session';  # from the ngx_headers module
 
         # your content handler goes here...
     }
 
     location /decrypt {
-        set_decode_base32 $session $cookie_lz_login; # from the ngx_set_misc module
+        set_decode_base32 $session $cookie_my_login; # from the ngx_set_misc module
         set_decrypt_session $raw $session;
 
         if ($raw = '') {
