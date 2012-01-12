@@ -18,20 +18,20 @@ typedef struct {
 
 
 static ngx_int_t ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
-        ngx_str_t *res, ngx_http_variable_value_t *v);
+    ngx_str_t *res, ngx_http_variable_value_t *v);
 
 static ngx_int_t ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
-        ngx_str_t *res, ngx_http_variable_value_t *v);
+    ngx_str_t *res, ngx_http_variable_value_t *v);
 
 
 static char * ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd,
-        void *conf);
+    void *conf);
 
 static char * ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd,
-        void *conf);
+    void *conf);
 
-static char * ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
-        void *conf);
+static char * ngx_http_encrypted_session_expires(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
 
 
 static void *ngx_http_encrypted_session_create_conf(ngx_conf_t *cf);
@@ -107,17 +107,17 @@ static ngx_command_t  ngx_http_encrypted_session_commands[] = {
 
 
 static ngx_http_module_t  ngx_http_encrypted_session_module_ctx = {
-    NULL,                                 /* preconfiguration */
-    NULL,                                 /* postconfiguration */
+    NULL,                                    /* preconfiguration */
+    NULL,                                    /* postconfiguration */
 
-    NULL,                                  /* create main configuration */
-    NULL,                                  /* init main configuration */
+    NULL,                                    /* create main configuration */
+    NULL,                                    /* init main configuration */
 
-    NULL,                                  /* create server configuration */
-    NULL,                                  /* merge server configuration */
+    NULL,                                    /* create server configuration */
+    NULL,                                    /* merge server configuration */
 
-    ngx_http_encrypted_session_create_conf,       /* create location configuration */
-    ngx_http_encrypted_session_merge_conf,        /* merge location configuration */
+    ngx_http_encrypted_session_create_conf,  /* create location configuration */
+    ngx_http_encrypted_session_merge_conf,   /* merge location configuration */
 };
 
 
@@ -157,8 +157,8 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    rc = ngx_http_encrypted_session_3des_mac_encrypt(r->pool, r->connection->log,
-            conf->iv, ngx_http_encrypted_session_iv_length,
+    rc = ngx_http_encrypted_session_3des_mac_encrypt(r->pool,
+            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, conf->expires, &dst, &len);
 
@@ -197,8 +197,8 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    rc = ngx_http_encrypted_session_3des_mac_decrypt(r->pool, r->connection->log,
-            conf->iv, ngx_http_encrypted_session_iv_length,
+    rc = ngx_http_encrypted_session_3des_mac_decrypt(r->pool,
+            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, &dst, &len);
 
@@ -280,9 +280,10 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
 
 static char *
-ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf)
 {
-    ngx_str_t                   *value;
+    ngx_str_t                          *value;
     ngx_http_encrypted_session_conf_t  *llcf = conf;
 
     if (llcf->expires != NGX_CONF_UNSET) {
