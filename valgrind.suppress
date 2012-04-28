@@ -3,8 +3,6 @@
 Memcheck:Param
 epoll_ctl(event)
 fun:epoll_ctl
-fun:ngx_event_process_init
-fun:ngx_single_process_cycle
 }
 {
    <insert_a_suppression_name_here>
