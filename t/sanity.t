@@ -73,7 +73,7 @@ b = abc
     encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
     #encrypted_session_key "abcdefghijklmnopqrstuvwx";
     encrypted_session_iv "12345678";
-    encrypted_session_expires 1;
+    encrypted_session_expires 3;
 
     location /encode {
         set $a 'abc';
