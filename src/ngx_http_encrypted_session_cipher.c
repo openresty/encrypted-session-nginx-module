@@ -12,7 +12,7 @@ static inline uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
 
 ngx_int_t
-ngx_http_encrypted_session_3des_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
+ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
         const u_char *iv, size_t iv_len, const u_char *key,
         size_t key_len, const u_char *in, size_t in_len,
         ngx_uint_t expires, u_char **dst, size_t *dst_len)
@@ -105,7 +105,7 @@ ngx_http_encrypted_session_3des_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     if (*dst_len > buf_size) {
         ngx_log_error(NGX_LOG_ERR, log, 0,
-                "encrypted_session: 3des_mac_encrypt: buffer error");
+                "encrypted_session: aes_mac_encrypt: buffer error");
 
         return NGX_ERROR;
     }
@@ -121,7 +121,7 @@ evp_error:
 
 
 ngx_int_t
-ngx_http_encrypted_session_3des_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
+ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
         const u_char *iv, size_t iv_len, const u_char *key,
         size_t key_len, const u_char *in, size_t in_len, u_char **dst,
         size_t *dst_len)
@@ -198,7 +198,7 @@ ngx_http_encrypted_session_3des_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     if (*dst_len > buf_size) {
         ngx_log_error(NGX_LOG_ERR, log, 0,
-                "encrypted_session: 3des_mac_decrypt: buffer error");
+                "encrypted_session: aes_mac_decrypt: buffer error");
 
         return NGX_ERROR;
     }

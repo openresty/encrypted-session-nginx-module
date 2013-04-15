@@ -157,7 +157,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    rc = ngx_http_encrypted_session_3des_mac_encrypt(r->pool,
+    rc = ngx_http_encrypted_session_aes_mac_encrypt(r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, conf->expires, &dst, &len);
@@ -197,7 +197,7 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    rc = ngx_http_encrypted_session_3des_mac_decrypt(r->pool,
+    rc = ngx_http_encrypted_session_aes_mac_decrypt(r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, &dst, &len);
