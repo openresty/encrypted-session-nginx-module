@@ -56,3 +56,5 @@ buildroot/
 util/wiki2pod.pl
 go
 build12
+Makefile
+*.plist
