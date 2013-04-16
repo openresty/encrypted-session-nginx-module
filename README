@@ -101,16 +101,16 @@ Directives
 
 Installation
     1. Grab the nginx source code from nginx.org (<http://nginx.org/ >), for
-        example, the version 1.0.11 (see nginx compatibility),
+        example, the version 1.2.7 (see nginx compatibility),
 
     2. Grab the NDK module from GitHub:
         http://github.com/simpl/ngx_devel_kit
 
     3. and then build the source with this module:
 
-        wget 'http://nginx.org/download/nginx-1.0.11.tar.gz'
-        tar -xzvf nginx-1.0.11.tar.gz
-        cd nginx-1.0.11/
+        wget 'http://nginx.org/download/nginx-1.2.7.tar.gz'
+        tar -xzvf nginx-1.2.7.tar.gz
+        cd nginx-1.2.7/
 
         # Here we assume you would install you nginx under /opt/nginx/.
         ./configure --prefix=/opt/nginx \
@@ -128,6 +128,8 @@ Installation
 
 Compatibility
     The following versions of Nginx should work with this module:
+
+    *   1.2.x (last tested: 1.2.7)
 
     *   1.1.x (last tested: 1.1.5)
 
@@ -195,13 +197,10 @@ Getting involved
     a commit bit to the source repository on GitHub.
 
 Author
-    agentzh (章亦春) *<agentzh@gmail.com>*
+    Yichun "agentzh" Zhang (章亦春) *<agentzh@gmail.com>*
 
 Copyright & License
-    Copyright (c) 2010, Taobao Inc., Alibaba Group ( http://www.taobao.com
-    ).
-
-    Copyright (c) 2009, agentzh <agentzh@gmail.com>.
+    Copyright (c) 2009-2013, Yichun Zhang (agentzh) <agentzh@gmail.com>, Cloud Flare Inc.
 
     This module is licensed under the terms of the BSD license.
 
