@@ -187,7 +187,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     if (! ret) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                "failed to decrypt session: bad AES-256 digest.");
+                       "failed to decrypt session: bad AES-256 digest");
 
         return NGX_ERROR;
     }
@@ -211,7 +211,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     if (ngx_strncmp(digest, new_digest, MD5_DIGEST_LENGTH) != 0) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                "failed to decrypt session: MD5 checksum mismatch.");
+                       "failed to decrypt session: MD5 checksum mismatch");
 
         return NGX_ERROR;
     }
@@ -236,9 +236,9 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
     if (expires_time
             && expires_time <= (uint64_t) now)
     {
-        dd("session expired: %lld < %lld", (long long) expires_time,
-                (long long) now);
-
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
+                       "encrypted_session: session expired: %uL <= %T",
+                       expires_time, now);
         return NGX_ERROR;
     }
 

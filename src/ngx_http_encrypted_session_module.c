@@ -157,6 +157,9 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                  "encrypted_session: expires=%T", conf->expires);
+
     rc = ngx_http_encrypted_session_aes_mac_encrypt(r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,

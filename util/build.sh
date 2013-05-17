@@ -10,6 +10,7 @@ force=$2
             #--with-cc=gcc46 \
 
 ngx-build $force $version \
+            --with-ld-opt="-L$PCRE_LIB -Wl,-rpath,$PCRE_LIB:$LIBDRIZZLE_LIB:$LUAJIT_LIB:/usr/local/lib" \
             --without-mail_pop3_module \
             --without-mail_imap_module \
             --without-mail_smtp_module \
@@ -22,6 +23,7 @@ ngx-build $force $version \
             --without-http_userid_module \
           --add-module=$root/../ndk-nginx-module \
           --add-module=$root/../echo-nginx-module \
+          --add-module=$root/../lua-nginx-module \
           --add-module=$root/../set-misc-nginx-module \
           --add-module=$root \
           --with-debug

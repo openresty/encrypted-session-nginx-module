@@ -5,7 +5,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * 2 * blocks();
+plan tests => repeat_each() * (2 * blocks() + 4);
 
 no_long_string();
 
@@ -39,6 +39,8 @@ __DATA__
 --- response_body
 res = ktrp3n437q42laejppc9d4bg0jpv0ejie106ooo65od9lf5huhs0====
 b = abc
+--- error_log
+encrypted_session: expires=0
 
 
 
@@ -92,6 +94,8 @@ b = abc
 --- response_body_like
 ^res = [0-9a-v=]{30,}
 b = abc$
+--- error_log
+encrypted_session: expires=3
 
 
 
@@ -180,4 +184,39 @@ valid: ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09l7a0rg10====
 GET /decode?_s=ktrp3n437q42laejppc9d4bg0j0i6np4tdpovhgdum09laa0rg10====
 --- response_body
 []
+
+
+
+=== TEST 8: expired
+--- config
+    encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
+    encrypted_session_expires 1;
+
+    location /encode {
+        set $a 'abc';
+        set_encrypt_session $res $a;
+        echo -n $res;
+    }
+
+    location /decode {
+        set_decrypt_session $b $args;
+        echo "decrypted: $b";
+    }
+
+    location /t {
+        content_by_lua '
+            local res = ngx.location.capture("/encode")
+            ngx.sleep(1.1)
+            res = ngx.location.capture("/decode?" .. res.body)
+            ngx.say(res.body)
+        ';
+    }
+--- request
+    GET /t
+--- response_body_like
+decrypted: 
+--- no_error_log
+[error]
+--- error_log eval
+qr/encrypted_session: session expired: \d+ <= \d+/
 
