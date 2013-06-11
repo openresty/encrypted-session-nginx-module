@@ -100,6 +100,13 @@ Directives
     set_decrypt_session
 
 Installation
+    This module is bundled and enabled by default in the ngx_openresty bundle:
+
+        http://openresty.org
+
+    Alternatively, you can install this module with the official Nginx source code
+    distribution like this:
+
     1. Grab the nginx source code from nginx.org (<http://nginx.org/ >), for
         example, the version 1.2.7 (see nginx compatibility),
 
