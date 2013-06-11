@@ -5,7 +5,7 @@ use Test::Nginx::Socket;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (2 * blocks() + 4);
+plan tests => repeat_each() * (2 * blocks() + 7);
 
 no_long_string();
 
@@ -219,4 +219,100 @@ decrypted:
 [error]
 --- error_log eval
 qr/encrypted_session: session expired: \d+ <= \d+/
+
+
+
+=== TEST 9: variable expires with if's (8d)
+--- config
+    encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
+    encrypted_session_expires 0;
+
+    location ~* '^/t/(\S+)' {
+        set $duration $1;
+        set $a 'abc';
+        if ($duration = '16d') {
+            encrypted_session_expires 16d;
+        }
+        if ($duration = '8d') {
+            encrypted_session_expires 8d;
+        }
+        if ($duration = '1d') {
+            encrypted_session_expires 1d;
+        }
+        set_encrypt_session $res $a;
+        set_encode_base32 $ppres $res;
+        add_header "X-Foo" $ppres;
+        return 204;
+    }
+--- request
+    GET /t/8d
+--- error_code: 204
+--- response_headers_like chop
+X-Foo: [a-z0-9=]+$
+--- error_log
+encrypted_session: expires=691200
+
+
+
+=== TEST 10: variable expires with if's (1d)
+--- config
+    encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
+    encrypted_session_expires 0;
+
+    location ~* '^/t/(\S+)' {
+        set $duration $1;
+        set $a 'abc';
+        if ($duration = '16d') {
+            encrypted_session_expires 16d;
+        }
+        if ($duration = '8d') {
+            encrypted_session_expires 8d;
+        }
+        if ($duration = '1d') {
+            encrypted_session_expires 1d;
+        }
+        set_encrypt_session $res $a;
+        set_encode_base32 $ppres $res;
+        add_header "X-Foo" $ppres;
+        return 204;
+    }
+--- request
+    GET /t/1d
+--- error_code: 204
+--- response_headers_like chop
+X-Foo: [a-z0-9=]+$
+--- error_log
+encrypted_session: expires=86400
+
+
+
+=== TEST 11: variable expires with if's (16d)
+--- config
+    encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
+    encrypted_session_expires 0;
+
+    location ~* '^/t/(\S+)' {
+        set $duration $1;
+        set $a 'abc';
+        if ($duration = '16d') {
+            encrypted_session_expires 16d;
+        }
+        if ($duration = '8d') {
+            encrypted_session_expires 8d;
+        }
+        if ($duration = '1d') {
+            encrypted_session_expires 1d;
+        }
+        set_encrypt_session $res $a;
+        set_encode_base32 $ppres $res;
+        add_header "X-Foo" $ppres;
+        return 204;
+    }
+--- request
+    GET /t/16d
+--- error_code: 204
+--- response_headers_like chop
+X-Foo: [a-z0-9=]+$
+--- error_log
+encrypted_session: expires=1382400
 
