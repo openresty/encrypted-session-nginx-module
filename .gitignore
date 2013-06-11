@@ -51,7 +51,7 @@ src/cipher.h
 pack.sh
 t/servroot/
 all
-build1[01]
+build1[0-9]
 buildroot/
 util/wiki2pod.pl
 go
