@@ -1,4 +1,12 @@
+
+/*
+ * Copyright (C) Yichun Zhang (agentzh)
+ */
+
+
+#ifndef DDEBUG
 #define DDEBUG 0
+#endif
 #include "ddebug.h"
 
 #include <ndk.h>
@@ -139,7 +147,7 @@ ngx_module_t  ngx_http_encrypted_session_module = {
 
 static ngx_int_t
 ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
-        ngx_str_t *res, ngx_http_variable_value_t *v)
+    ngx_str_t *res, ngx_http_variable_value_t *v)
 {
     size_t                   len;
     u_char                  *dst;
@@ -158,7 +166,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     }
 
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                  "encrypted_session: expires=%T", conf->expires);
+                   "encrypted_session: expires=%T", conf->expires);
 
     rc = ngx_http_encrypted_session_aes_mac_encrypt(r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
@@ -170,7 +178,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         len = 0;
 
         ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-                "encrypted_session: failed to encrypt");
+                      "encrypted_session: failed to encrypt");
     }
 
     res->data = dst;
@@ -182,7 +190,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
 
 static ngx_int_t
 ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
-        ngx_str_t *res, ngx_http_variable_value_t *v)
+    ngx_str_t *res, ngx_http_variable_value_t *v)
 {
     size_t                   len;
     u_char                  *dst;
@@ -194,8 +202,8 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 
     if (conf->key == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "encrypted_session: a key is required to be "
-                "defined by the encrypted_session_key directive");
+                      "encrypted_session: a key is required to be "
+                      "defined by the encrypted_session_key directive");
 
         return NGX_ERROR;
     }
@@ -231,8 +239,9 @@ ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (value[1].len != ngx_http_encrypted_session_key_length) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                "encrypted_session_key: the key must be of %d bytes long",
-                ngx_http_encrypted_session_key_length);
+                           "encrypted_session_key: the key must be of %d "
+                           "bytes long",
+                           ngx_http_encrypted_session_key_length);
 
         return NGX_CONF_ERROR;
     }
@@ -257,8 +266,8 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (value[1].len > ngx_http_encrypted_session_iv_length) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                "encrypted_session_iv: the init vector must NOT "
-                "be longer than %d bytes",
+                           "encrypted_session_iv: the init vector must NOT "
+                           "be longer than %d bytes",
                 ngx_http_encrypted_session_iv_length);
 
         return NGX_CONF_ERROR;
@@ -331,15 +340,13 @@ ngx_http_encrypted_session_merge_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_http_encrypted_session_conf_t *prev = parent;
     ngx_http_encrypted_session_conf_t *conf = child;
 
-    ngx_conf_merge_ptr_value(conf->key, prev->key,
-            NULL);
+    ngx_conf_merge_ptr_value(conf->key, prev->key, NULL);
 
     ngx_conf_merge_ptr_value(conf->iv, prev->iv,
-            ngx_http_encrypted_session_default_iv);
+                             ngx_http_encrypted_session_default_iv);
 
     ngx_conf_merge_value(conf->expires, prev->expires,
-            ngx_http_encrypted_session_default_expires);
+                         ngx_http_encrypted_session_default_expires);
 
     return NGX_CONF_OK;
 }
-
