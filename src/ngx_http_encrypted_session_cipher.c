@@ -5,10 +5,11 @@
 
 #include <openssl/evp.h>
 #include <openssl/md5.h>
+#include <stdint.h>
 
 
-static inline uint64_t ngx_http_encrypted_session_ntohll(uint64_t n);
-static inline uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
+static uint64_t ngx_http_encrypted_session_ntohll(uint64_t n);
+static uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
 
 ngx_int_t
@@ -254,7 +255,7 @@ evp_error:
 }
 
 
-static inline uint64_t
+static uint64_t
 ngx_http_encrypted_session_ntohll(uint64_t n) {
 #ifdef ntohll
     return ntohll(n);
@@ -264,7 +265,7 @@ ngx_http_encrypted_session_ntohll(uint64_t n) {
 }
 
 
-static inline uint64_t
+static uint64_t
 ngx_http_encrypted_session_htonll(uint64_t n) {
 #ifdef htonll
     return htonll(n);

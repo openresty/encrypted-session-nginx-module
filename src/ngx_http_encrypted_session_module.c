@@ -42,14 +42,14 @@ static char *ngx_http_encrypted_session_merge_conf(ngx_conf_t *cf, void *parent,
 
 static  ndk_set_var_t  ngx_http_set_encode_encrypted_session_filter = {
     NDK_SET_VAR_VALUE,
-    ngx_http_set_encode_encrypted_session,
+    (void *) ngx_http_set_encode_encrypted_session,
     1,
     NULL
 };
 
 static  ndk_set_var_t  ngx_http_set_decode_encrypted_session_filter = {
     NDK_SET_VAR_VALUE,
-    ngx_http_set_decode_encrypted_session,
+    (void *) ngx_http_set_decode_encrypted_session,
     1,
     NULL
 };
@@ -163,7 +163,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     rc = ngx_http_encrypted_session_aes_mac_encrypt(r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
-            v->data, v->len, conf->expires, &dst, &len);
+            v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
 
     if (rc != NGX_OK) {
         dst = NULL;
