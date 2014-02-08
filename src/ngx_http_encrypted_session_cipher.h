@@ -24,5 +24,11 @@ ngx_int_t ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool,
         size_t *dst_len);
 
 
+#if defined(_MSC_VER) /* Microsoft Visual C++ */
+#define ntohll(n) ( _byteswap_uint64((uint64_t)n) )
+#define htonll(n) ( _byteswap_uint64((uint64_t)n) )
+#endif
+
+
 #endif /* NGX_HTTP_ENCRYPTED_SESSION_CIPHER_H */
 
