@@ -261,7 +261,8 @@ ngx_http_encrypted_session_ntohll(uint64_t n)
 #ifdef ntohll
     return ntohll(n);
 #else
-    return ((uint64_t) ntohl(n) << 32) + ntohl(n >> 32);
+    return ((uint64_t) ntohl((unsigned long) n) << 32)
+           + ntohl((unsigned long) (n >> 32));
 #endif
 }
 
@@ -272,6 +273,7 @@ ngx_http_encrypted_session_htonll(uint64_t n)
 #ifdef htonll
     return htonll(n);
 #else
-    return ((uint64_t) htonl(n) << 32) + htonl(n >> 32);
+    return ((uint64_t) htonl((unsigned long) n) << 32)
+           + htonl((unsigned long) (n >> 32));
 #endif
 }
