@@ -56,7 +56,7 @@ Description
        location /blah {
               set_decrypt_session $raw_text $encrypted;
 
-             # this directive is from thengx_set_misc module
+              # this directive is from the ngx_set_misc module
               set_escape_uri $escaped_raw_text $raw_text;
 
               fastcgi_param QUERY_STRING "uid=$uid";
@@ -87,13 +87,14 @@ Directives
         encrypted session string, such that when the session is being decrypted
         later, the server can pull the expiration time out of the session and
         compare it with the server's current system time. No matter how you
-        transfer and store your session, like using cookies, or uri args, or whatever.
+        transfer and store your session, like using cookies, or uri args,
+        or whatever.
 
-        People may confuse this setting with the expiration date of http cookies.
-        This directive simply controls when the session gets expired; it knows
-        nothing about http cookies. Even if the end user intercepted this session
-        from cookie by himself and uses it later manually, the server will still
-        reject it when the expiration time gets passed.
+        People may confuse this setting with the expiration date of http
+        cookies. This directive simply controls when the session gets expired;
+        it knows nothing about http cookies. Even if the end user intercepted
+        this session from cookie by himself and uses it later manually, the
+        server will still reject it when the expiration time gets passed.
 
     set_encrypt_session
 
