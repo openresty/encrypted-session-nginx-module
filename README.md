@@ -20,6 +20,7 @@ Table of Contents
     * [set_encrypt_session](#set_encrypt_session)
     * [set_decrypt_session](#set_decrypt_session)
 * [Installation](#installation)
+    * [Building as a dynamic module](#building-as-a-dynamic-module)
 * [Compatibility](#compatibility)
 * [Report Bugs](#report-bugs)
 * [Source Repository](#source-repository)
@@ -246,6 +247,20 @@ Download the latest version of the release tarball of this module from [encrypte
 Also, this module is included and enabled by default in the [ngx_openresty bundle](http://openresty.org).
 
 OpenSSL should not be disabled in your Nginx build.
+
+[Back to TOC](#table-of-contents)
+
+Building as a dynamic module
+----------------------------
+
+Starting from NGINX 1.9.11, you can also compile this module as a dynamic module, by using the `--add-dynamic-module=PATH` option instead of `--add-module=PATH` on the
+`./configure` command line above. And then you can explicitly load the module in your `nginx.conf` via the [load_module](http://nginx.org/en/docs/ngx_core_module.html#load_module)
+directive, for example,
+
+```nginx
+load_module /path/to/modules/ndk_http_module.so;  # assuming NDK is built as a dynamic module too
+load_module /path/to/modules/ngx_http_encrypted_session_module.so;
+```
 
 [Back to TOC](#table-of-contents)
 
