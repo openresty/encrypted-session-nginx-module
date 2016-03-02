@@ -226,20 +226,19 @@ You're recommended to install this module (as well as the Nginx core and many ot
 Alternatively, you can install this module manually with the Nginx source:
 
 Grab the nginx source code from [nginx.org](http://nginx.org/), for example,
-the version 1.7.10 (see [nginx compatibility](#compatibility)), and then build the source with this module:
+the version 1.9.7 (see [nginx compatibility](#compatibility)), and then build the source with this module:
 
 ```bash
+wget 'http://nginx.org/download/nginx-1.9.7.tar.gz'
+tar -xzvf nginx-1.9.7.tar.gz
+cd nginx-1.9.7/
 
- $ wget 'http://nginx.org/download/nginx-1.7.10.tar.gz'
- $ tar -xzvf nginx-1.7.10.tar.gz
- $ cd nginx-1.7.10/
+Here we assume you would install you nginx under /opt/nginx/.
+./configure --prefix=/opt/nginx \
+  --add-module=/path/to/encrypted-session-nginx-module
 
- # Here we assume you would install you nginx under /opt/nginx/.
- $ ./configure --prefix=/opt/nginx \
-     --add-module=/path/to/encrypted-session-nginx-module
-
- $ make -j2
- $ make install
+make -j2
+make install
 ```
 
 Download the latest version of the release tarball of this module from [encrypted-session-nginx-module file list](https://github.com/openresty/encrypted-session-nginx-module/tags).
@@ -269,6 +268,8 @@ Compatibility
 
 The following versions of Nginx should work with this module:
 
+* **1.9.x** (last tested: 1.9.7)
+* **1.8.x**
 * **1.7.x** (last tested: 1.7.10)
 * **1.6.x**
 * **1.5.x** (last tested: 1.5.12)
@@ -325,7 +326,7 @@ Yichun "agentzh" Zhang (章亦春) &lt;agentzh@gmail.com&gt;
 Copyright & License
 ===================
 
-Copyright (c) 2009-2015, Yichun Zhang (agentzh) &lt;agentzh@gmail.com&gt;, Cloud Flare Inc.
+Copyright (c) 2009-2016, Yichun Zhang (agentzh) &lt;agentzh@gmail.com&gt;, Cloud Flare Inc.
 
 This module is licensed under the terms of the BSD license.
 
