@@ -21,11 +21,11 @@ ngx-build $force $version \
             --without-http_autoindex_module \
             --without-http_auth_basic_module \
             --without-http_userid_module \
-          --add-dynamic-module=$root/../ndk-nginx-module \
+          --add-module=$root/../ndk-nginx-module \
           --add-module=$root/../echo-nginx-module \
-          --add-dynamic-module=$root/../lua-nginx-module \
-          --add-dynamic-module=$root/../set-misc-nginx-module \
-          --add-dynamic-module=$root \
+          --add-module=$root/../lua-nginx-module \
+          --add-module=$root/../set-misc-nginx-module \
+          --add-module=$root \
           --with-debug
           #--add-module=$home/work/ndk \
   #--without-http_ssi_module  # we cannot disable ssi because echo_location_async depends on it (i dunno why?!)
