@@ -235,7 +235,8 @@ cd nginx-1.9.15/
 
 Here we assume you would install you nginx under /opt/nginx/.
 ./configure --prefix=/opt/nginx \
-  --add-module=/path/to/encrypted-session-nginx-module
+    --with-http_ssl_module \
+    --add-module=/path/to/encrypted-session-nginx-module
 
 make -j2
 make install
