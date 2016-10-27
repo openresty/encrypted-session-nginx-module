@@ -98,13 +98,14 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
     p += len;
 
     ret = EVP_EncryptFinal(&ctx, p, &len);
-    if (!ret) {
-        return NGX_ERROR;
-    }
 
     /* XXX we should still explicitly release the ctx
      * or we'll leak memory here */
     EVP_CIPHER_CTX_cleanup(&ctx);
+
+    if (!ret) {
+        return NGX_ERROR;
+    }
 
     p += len;
 
