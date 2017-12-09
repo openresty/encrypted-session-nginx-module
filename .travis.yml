@@ -17,15 +17,25 @@ env:
     - LUAJIT_INC=$LUAJIT_PREFIX/include/luajit-2.1
     - LUA_INCLUDE_DIR=$LUAJIT_INC
     - LUA_CMODULE_DIR=/lib
+    - OPENSSL_PREFIX=/opt/ssl
+    - OPENSSL_LIB=$OPENSSL_PREFIX/lib
+    - OPENSSL_INC=$OPENSSL_PREFIX/include
+    - PCRE_VER=8.41
+    - PCRE_PREFIX=/opt/pcre
+    - PCRE_LIB=$PCRE_PREFIX/lib
+    - PCRE_INC=$PCRE_PREFIX/include
     - JOBS=3
     - NGX_BUILD_JOBS=$JOBS
   matrix:
-    - NGINX_VERSION=1.9.15
+    - NGINX_VERSION=1.13.6 OPENSSL_VER=1.0.2k
+    - NGINX_VERSION=1.13.6 OPENSSL_VER=1.1.0c
 
 before_install:
   - sudo apt-get install -qq -y axel cpanminus libtest-base-perl libtext-diff-perl liburi-perl libwww-perl libtest-longstring-perl liblist-moreutils-perl > build.log 2>&1 || (cat build.log && exit 1)
 
 install:
+  - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache http://ftp.cs.stanford.edu/pub/exim/pcre/pcre-$PCRE_VER.tar.gz; fi
+  - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz; fi
   - git clone https://github.com/openresty/nginx-devel-utils.git
   - git clone https://github.com/openresty/openresty.git ../openresty
   - git clone https://github.com/openresty/no-pool-nginx.git ../no-pool-nginx
@@ -40,6 +50,18 @@ script:
   - cd luajit2
   - make -j$JOBS CCDEBUG=-g Q= PREFIX=$LUAJIT_PREFIX CC=$CC XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT' > build.log 2>&1 || (cat build.log && exit 1)
   - sudo make install PREFIX=$LUAJIT_PREFIX > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ..
+  - tar zxf download-cache/pcre-$PCRE_VER.tar.gz
+  - cd pcre-$PCRE_VER/
+  - ./configure --prefix=$PCRE_PREFIX --enable-jit --enable-utf --enable-unicode-properties > build.log 2>&1 || (cat build.log && exit 1)
+  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo PATH=$PATH make install > build.log 2>&1 || (cat build.log && exit 1)
+  - cd ..
+  - tar zxf download-cache/openssl-$OPENSSL_VER.tar.gz
+  - cd openssl-$OPENSSL_VER/
+  - ./config no-threads shared -g --prefix=$OPENSSL_PREFIX -DPURIFY > build.log 2>&1 || (cat build.log && exit 1)
+  - make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+  - sudo make PATH=$PATH install_sw > build.log 2>&1 || (cat build.log && exit 1)
   - cd ..
   - cd test-nginx && sudo cpanm . && cd ..
   - export PATH=$PWD/work/nginx/sbin:$PWD/nginx-devel-utils:$PATH
