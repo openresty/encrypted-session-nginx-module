@@ -11,8 +11,8 @@ force=$2
 
 ngx-build $force $version \
             --with-http_ssl_module \
-            --with-cc-opt="-I$OPENSSL_INC -I$PCRE_INC" \
-            --with-ld-opt="-L$OPENSSL_LIB -L$PCRE_LIB -Wl,-rpath,$OPENSSL_LIB:$PCRE_LIB:$LIBDRIZZLE_LIB" \
+            --with-cc-opt="-I$OPENSSL_INC" \
+            --with-ld-opt="-L$OPENSSL_LIB -Wl,-rpath,$OPENSSL_LIB" \
             --without-mail_pop3_module \
             --without-mail_imap_module \
             --without-mail_smtp_module \
