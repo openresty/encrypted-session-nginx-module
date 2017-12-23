@@ -19,6 +19,16 @@
 static uint64_t ngx_http_encrypted_session_ntohll(uint64_t n);
 static uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
+typedef int (*cipher_ctx_reset_handle) (EVP_CIPHER_CTX *ctx);
+
+#if OPENSSL_VERSION_NUMBER >= 0x1010000fL
+static cipher_ctx_reset_handle reset_cipher_ctx = EVP_CIPHER_CTX_reset;
+#else
+static cipher_ctx_reset_handle reset_cipher_ctx = EVP_CIPHER_CTX_cleanup;
+#endif
+
+static EVP_CIPHER_CTX *session_ctx;
+
 
 ngx_int_t
 ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
@@ -26,7 +36,6 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
     const u_char *in, size_t in_len, ngx_uint_t expires, u_char **dst,
     size_t *dst_len)
 {
-    EVP_CIPHER_CTX          *ctx;
     const EVP_CIPHER        *cipher;
     u_char                  *p, *data;
     int                      ret;
@@ -39,7 +48,15 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
         return NGX_ERROR;
     }
 
-    ctx = EVP_CIPHER_CTX_new();
+    if (session_ctx == NULL) {
+        session_ctx = EVP_CIPHER_CTX_new();
+        if (session_ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, log, 0,
+                          "encrypted_session: aes_mac_encrypt: no memory");
+
+            return NGX_ERROR;
+        }
+    }
 
     cipher = EVP_aes_256_cbc();
 
@@ -83,23 +100,23 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += MD5_DIGEST_LENGTH;
 
-    ret = EVP_EncryptInit(ctx, cipher, key, iv);
+    ret = EVP_EncryptInit(session_ctx, cipher, key, iv);
     if (!ret) {
         goto evp_error;
     }
 
     /* encrypt the raw input data */
 
-    ret = EVP_EncryptUpdate(ctx, p, &len, data, data_size);
+    ret = EVP_EncryptUpdate(session_ctx, p, &len, data, data_size);
     if (!ret) {
         goto evp_error;
     }
 
     p += len;
 
-    ret = EVP_EncryptFinal(ctx, p, &len);
+    ret = EVP_EncryptFinal(session_ctx, p, &len);
 
-    EVP_CIPHER_CTX_free(ctx);
+    reset_cipher_ctx(session_ctx);
 
     if (!ret) {
         return NGX_ERROR;
@@ -120,7 +137,7 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
 evp_error:
 
-    EVP_CIPHER_CTX_free(ctx);
+    reset_cipher_ctx(session_ctx);
 
     return NGX_ERROR;
 }
@@ -131,7 +148,6 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
     const u_char *iv, size_t iv_len, const u_char *key, size_t key_len,
     const u_char *in, size_t in_len, u_char **dst, size_t *dst_len)
 {
-    EVP_CIPHER_CTX          *ctx;
     const EVP_CIPHER        *cipher;
     int                      ret;
     size_t                   block_size, buf_size;
@@ -151,11 +167,19 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     digest = in;
 
-    ctx = EVP_CIPHER_CTX_new();
+    if (session_ctx == NULL) {
+        session_ctx = EVP_CIPHER_CTX_new();
+        if (session_ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, log, 0,
+                          "encrypted_session: aes_mac_encrypt: no memory");
+
+            return NGX_ERROR;
+        }
+    }
 
     cipher = EVP_aes_256_cbc();
 
-    ret = EVP_DecryptInit(ctx, cipher, key, iv);
+    ret = EVP_DecryptInit(session_ctx, cipher, key, iv);
     if (!ret) {
         goto evp_error;
     }
@@ -172,7 +196,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     *dst = p;
 
-    ret = EVP_DecryptUpdate(ctx, p, &len, in + MD5_DIGEST_LENGTH,
+    ret = EVP_DecryptUpdate(session_ctx, p, &len, in + MD5_DIGEST_LENGTH,
                             in_len - MD5_DIGEST_LENGTH);
 
     if (!ret) {
@@ -182,9 +206,9 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += len;
 
-    ret = EVP_DecryptFinal(ctx, p, &len);
+    ret = EVP_DecryptFinal(session_ctx, p, &len);
 
-    EVP_CIPHER_CTX_free(ctx);
+    reset_cipher_ctx(session_ctx);
 
     if (!ret) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
@@ -246,7 +270,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
 evp_error:
 
-    EVP_CIPHER_CTX_free(ctx);
+    reset_cipher_ctx(session_ctx);
 
     return NGX_ERROR;
 }
