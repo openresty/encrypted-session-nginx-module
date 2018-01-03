@@ -23,13 +23,13 @@ enum {
 
 
 ngx_int_t ngx_http_encrypted_session_aes_mac_encrypt(
-        ngx_http_encrypted_session_main_conf_t *esmcf, ngx_pool_t *pool,
+        ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
         ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
         size_t key_len, const u_char *in, size_t in_len,
         ngx_uint_t expires, u_char **dst, size_t *dst_len);
 
 ngx_int_t ngx_http_encrypted_session_aes_mac_decrypt(
-        ngx_http_encrypted_session_main_conf_t *esmcf, ngx_pool_t *pool,
+        ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
         ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
         size_t key_len, const u_char *in, size_t in_len, u_char **dst,
         size_t *dst_len);

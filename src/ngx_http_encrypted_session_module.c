@@ -160,9 +160,9 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     ngx_int_t                rc;
 
     ngx_http_encrypted_session_conf_t      *conf;
-    ngx_http_encrypted_session_main_conf_t *esmcf;
+    ngx_http_encrypted_session_main_conf_t *emcf;
 
-    esmcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
+    emcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
     conf = ngx_http_get_module_loc_conf(r, ngx_http_encrypted_session_module);
 
     if (conf->key == NULL) {
@@ -176,7 +176,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "encrypted_session: expires=%T", conf->expires);
 
-    rc = ngx_http_encrypted_session_aes_mac_encrypt(esmcf, r->pool,
+    rc = ngx_http_encrypted_session_aes_mac_encrypt(emcf, r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
@@ -205,9 +205,9 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
     ngx_int_t                rc;
 
     ngx_http_encrypted_session_conf_t      *conf;
-    ngx_http_encrypted_session_main_conf_t *esmcf;
+    ngx_http_encrypted_session_main_conf_t *emcf;
 
-    esmcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
+    emcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
     conf = ngx_http_get_module_loc_conf(r, ngx_http_encrypted_session_module);
 
     if (conf->key == NULL) {
@@ -218,7 +218,7 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
-    rc = ngx_http_encrypted_session_aes_mac_decrypt(esmcf, r->pool,
+    rc = ngx_http_encrypted_session_aes_mac_decrypt(emcf, r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
             conf->key, ngx_http_encrypted_session_key_length,
             v->data, v->len, &dst, &len);
@@ -329,12 +329,11 @@ ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
 static void
 ngx_http_encrypted_session_free_cipher_ctx(void *data)
 {
-    ngx_http_encrypted_session_main_conf_t      *esmcf;
+    ngx_http_encrypted_session_main_conf_t      *emcf = data;
 
-    esmcf = (ngx_http_encrypted_session_main_conf_t *) data;
-    if (esmcf->session_ctx != NULL) {
-        EVP_CIPHER_CTX_free(esmcf->session_ctx);
-        esmcf->session_ctx = NULL;
+    if (emcf->session_ctx != NULL) {
+        EVP_CIPHER_CTX_free(emcf->session_ctx);
+        emcf->session_ctx = NULL;
     }
 }
 
@@ -343,9 +342,9 @@ static ngx_int_t
 ngx_http_encrypted_session_init(ngx_conf_t *cf)
 {
     ngx_pool_cleanup_t                        *cln;
-    ngx_http_encrypted_session_main_conf_t    *esmcf;
+    ngx_http_encrypted_session_main_conf_t    *emcf;
 
-    esmcf =
+    emcf =
         ngx_http_conf_get_module_main_conf(cf,
                                            ngx_http_encrypted_session_module);
 
@@ -354,7 +353,7 @@ ngx_http_encrypted_session_init(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
-    cln->data = esmcf;
+    cln->data = emcf;
     cln->handler = ngx_http_encrypted_session_free_cipher_ctx;
     return NGX_OK;
 }
@@ -363,27 +362,27 @@ ngx_http_encrypted_session_init(ngx_conf_t *cf)
 static void *
 ngx_http_encrypted_session_create_main_conf(ngx_conf_t *cf)
 {
-    ngx_http_encrypted_session_main_conf_t    *esmcf;
+    ngx_http_encrypted_session_main_conf_t    *emcf;
 
-    esmcf = ngx_pcalloc(cf->pool,
+    emcf = ngx_pcalloc(cf->pool,
                         sizeof(ngx_http_encrypted_session_main_conf_t));
-    if (esmcf == NULL) {
+    if (emcf == NULL) {
         return NULL;
     }
 
-    return esmcf;
+    return emcf;
 }
 
 
 static char *
 ngx_http_encrypted_session_init_main_conf(ngx_conf_t *cf, void *conf)
 {
-    ngx_http_encrypted_session_main_conf_t *esmcf = conf;
+    ngx_http_encrypted_session_main_conf_t *emcf = conf;
 
 #if OPENSSL_VERSION_NUMBER >= 0x1010000fL
-    esmcf->reset_cipher_ctx = EVP_CIPHER_CTX_reset;
+    emcf->reset_cipher_ctx = EVP_CIPHER_CTX_reset;
 #else
-    esmcf->reset_cipher_ctx = EVP_CIPHER_CTX_cleanup;
+    emcf->reset_cipher_ctx = EVP_CIPHER_CTX_cleanup;
 #endif
 
     return NGX_CONF_OK;
