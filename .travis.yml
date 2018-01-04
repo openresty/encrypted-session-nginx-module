@@ -24,10 +24,6 @@ env:
     - PCRE_PREFIX=/opt/pcre
     - PCRE_LIB=$PCRE_PREFIX/lib
     - PCRE_INC=$PCRE_PREFIX/include
-    - DRIZZLE_VER=2011.07.21
-    - LIBDRIZZLE_PREFIX=/opt/drizzle
-    - LIBDRIZZLE_INC=$LIBDRIZZLE_PREFIX/include/libdrizzle-1.0
-    - LIBDRIZZLE_LIB=$LIBDRIZZLE_PREFIX/lib
     - JOBS=3
     - NGX_BUILD_JOBS=$JOBS
   matrix:
@@ -38,7 +34,6 @@ before_install:
   - sudo apt-get install -qq -y axel cpanminus libtest-base-perl libtext-diff-perl liburi-perl libwww-perl libtest-longstring-perl liblist-moreutils-perl > build.log 2>&1 || (cat build.log && exit 1)
 
 install:
-  - if [ ! -f download-cache/drizzle7-$DRIZZLE_VER.tar.gz ]; then wget -P download-cache http://openresty.org/download/drizzle7-$DRIZZLE_VER.tar.gz; fi
   - if [ ! -f download-cache/pcre-$PCRE_VER.tar.gz ]; then wget -P download-cache http://ftp.cs.stanford.edu/pub/exim/pcre/pcre-$PCRE_VER.tar.gz; fi
   - if [ ! -f download-cache/openssl-$OPENSSL_VER.tar.gz ]; then wget -P download-cache https://www.openssl.org/source/openssl-$OPENSSL_VER.tar.gz; fi
   - git clone https://github.com/openresty/nginx-devel-utils.git
@@ -55,11 +50,6 @@ script:
   - cd luajit2
   - make -j$JOBS CCDEBUG=-g Q= PREFIX=$LUAJIT_PREFIX CC=$CC XCFLAGS='-DLUA_USE_APICHECK -DLUA_USE_ASSERT' > build.log 2>&1 || (cat build.log && exit 1)
   - sudo make install PREFIX=$LUAJIT_PREFIX > build.log 2>&1 || (cat build.log && exit 1)
-  - cd ..
-  - tar xzf download-cache/drizzle7-$DRIZZLE_VER.tar.gz && cd drizzle7-$DRIZZLE_VER
-  - ./configure --prefix=$LIBDRIZZLE_PREFIX --without-server > build.log 2>&1 || (cat build.log && exit 1)
-  - make libdrizzle-1.0 -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
-  - sudo make install-libdrizzle-1.0 > build.log 2>&1 || (cat build.log && exit 1)
   - cd ..
   - tar zxf download-cache/pcre-$PCRE_VER.tar.gz
   - cd pcre-$PCRE_VER/
