@@ -21,12 +21,12 @@ static uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
 
 ngx_int_t
-ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
-    const u_char *iv, size_t iv_len, const u_char *key, size_t key_len,
-    const u_char *in, size_t in_len, ngx_uint_t expires, u_char **dst,
-    size_t *dst_len)
+ngx_http_encrypted_session_aes_mac_encrypt(
+    ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
+    ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
+    size_t key_len, const u_char *in, size_t in_len, ngx_uint_t expires,
+    u_char **dst, size_t *dst_len)
 {
-    EVP_CIPHER_CTX           ctx;
     const EVP_CIPHER        *cipher;
     u_char                  *p, *data;
     int                      ret;
@@ -39,7 +39,15 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
         return NGX_ERROR;
     }
 
-    EVP_CIPHER_CTX_init(&ctx);
+    if (emcf->session_ctx == NULL) {
+        emcf->session_ctx = EVP_CIPHER_CTX_new();
+        if (emcf->session_ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, log, 0,
+                          "encrypted_session: aes_mac_encrypt: no memory");
+
+            return NGX_ERROR;
+        }
+    }
 
     cipher = EVP_aes_256_cbc();
 
@@ -53,7 +61,7 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p = ngx_palloc(pool, buf_size + data_size);
     if (p == NULL) {
-        return NGX_ERROR;
+        goto evp_error;
     }
 
     *dst = p;
@@ -83,25 +91,23 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += MD5_DIGEST_LENGTH;
 
-    ret = EVP_EncryptInit(&ctx, cipher, key, iv);
+    ret = EVP_EncryptInit(emcf->session_ctx, cipher, key, iv);
     if (!ret) {
         goto evp_error;
     }
 
     /* encrypt the raw input data */
 
-    ret = EVP_EncryptUpdate(&ctx, p, &len, data, data_size);
+    ret = EVP_EncryptUpdate(emcf->session_ctx, p, &len, data, data_size);
     if (!ret) {
         goto evp_error;
     }
 
     p += len;
 
-    ret = EVP_EncryptFinal(&ctx, p, &len);
+    ret = EVP_EncryptFinal(emcf->session_ctx, p, &len);
 
-    /* XXX we should still explicitly release the ctx
-     * or we'll leak memory here */
-    EVP_CIPHER_CTX_cleanup(&ctx);
+    emcf->reset_cipher_ctx(emcf->session_ctx);
 
     if (!ret) {
         return NGX_ERROR;
@@ -122,18 +128,19 @@ ngx_http_encrypted_session_aes_mac_encrypt(ngx_pool_t *pool, ngx_log_t *log,
 
 evp_error:
 
-    EVP_CIPHER_CTX_cleanup(&ctx);
+    emcf->reset_cipher_ctx(emcf->session_ctx);
 
     return NGX_ERROR;
 }
 
 
 ngx_int_t
-ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
-    const u_char *iv, size_t iv_len, const u_char *key, size_t key_len,
-    const u_char *in, size_t in_len, u_char **dst, size_t *dst_len)
+ngx_http_encrypted_session_aes_mac_decrypt(
+    ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
+    ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
+    size_t key_len, const u_char *in, size_t in_len, u_char **dst,
+    size_t *dst_len)
 {
-    EVP_CIPHER_CTX           ctx;
     const EVP_CIPHER        *cipher;
     int                      ret;
     size_t                   block_size, buf_size;
@@ -153,11 +160,19 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     digest = in;
 
-    EVP_CIPHER_CTX_init(&ctx);
+    if (emcf->session_ctx == NULL) {
+        emcf->session_ctx = EVP_CIPHER_CTX_new();
+        if (emcf->session_ctx == NULL) {
+            ngx_log_error(NGX_LOG_ERR, log, 0,
+                          "encrypted_session: aes_mac_encrypt: no memory");
+
+            return NGX_ERROR;
+        }
+    }
 
     cipher = EVP_aes_256_cbc();
 
-    ret = EVP_DecryptInit(&ctx, cipher, key, iv);
+    ret = EVP_DecryptInit(emcf->session_ctx, cipher, key, iv);
     if (!ret) {
         goto evp_error;
     }
@@ -169,12 +184,12 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p = ngx_palloc(pool, buf_size);
     if (p == NULL) {
-        return NGX_ERROR;
+        goto evp_error;
     }
 
     *dst = p;
 
-    ret = EVP_DecryptUpdate(&ctx, p, &len, in + MD5_DIGEST_LENGTH,
+    ret = EVP_DecryptUpdate(emcf->session_ctx, p, &len, in + MD5_DIGEST_LENGTH,
                             in_len - MD5_DIGEST_LENGTH);
 
     if (!ret) {
@@ -184,11 +199,9 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
     p += len;
 
-    ret = EVP_DecryptFinal(&ctx, p, &len);
+    ret = EVP_DecryptFinal(emcf->session_ctx, p, &len);
 
-    /* XXX we should still explicitly release the ctx
-     * or we'll leak memory here */
-    EVP_CIPHER_CTX_cleanup(&ctx);
+    emcf->reset_cipher_ctx(emcf->session_ctx);
 
     if (!ret) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
@@ -250,7 +263,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(ngx_pool_t *pool, ngx_log_t *log,
 
 evp_error:
 
-    EVP_CIPHER_CTX_cleanup(&ctx);
+    emcf->reset_cipher_ctx(emcf->session_ctx);
 
     return NGX_ERROR;
 }
