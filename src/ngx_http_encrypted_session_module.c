@@ -167,8 +167,8 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
 
     if (conf->key == NULL) {
         ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
-                "encrypted_session: a key is required to be "
-                "defined by the encrypted_session_key directive");
+                      "encrypted_session: a key is required to be "
+                      "defined by the encrypted_session_key directive");
 
         return NGX_ERROR;
     }
@@ -238,7 +238,8 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 static char *
 ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                       *value;
+    ngx_str_t       *value;
+
     ngx_http_encrypted_session_conf_t      *llcf = conf;
 
     if (llcf->key != NGX_CONF_UNSET_PTR) {
@@ -265,7 +266,8 @@ ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 static char *
 ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t                   *value;
+    ngx_str_t       *value;
+
     ngx_http_encrypted_session_conf_t  *llcf = conf;
 
     if (llcf->iv != NGX_CONF_UNSET_PTR) {
@@ -283,8 +285,7 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    llcf->iv = ngx_pcalloc(cf->pool,
-            ngx_http_encrypted_session_iv_length);
+    llcf->iv = ngx_pcalloc(cf->pool, ngx_http_encrypted_session_iv_length);
 
     if (llcf->iv == NULL) {
         return NGX_CONF_ERROR;
@@ -320,7 +321,7 @@ ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
         return "invalid value";
     }
 
-    dd("expires: %d", (int)llcf->expires);
+    dd("expires: %d", (int) llcf->expires);
 
     return NGX_CONF_OK;
 }
