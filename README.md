@@ -331,7 +331,7 @@ Yichun "agentzh" Zhang (章亦春) &lt;agentzh@gmail.com&gt;
 Copyright & License
 ===================
 
-Copyright (c) 2009-2017, Yichun Zhang (agentzh) &lt;agentzh@gmail.com&gt;, OpenResty Inc.
+Copyright (c) 2009-2018, Yichun Zhang (agentzh) &lt;agentzh@gmail.com&gt;, OpenResty Inc.
 
 This module is licensed under the terms of the BSD license.
 
