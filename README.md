@@ -46,7 +46,7 @@ encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
 encrypted_session_iv "1234567812345678";
 
 # default: 1d (1 day)
-encrypted_session_expires 2; # in sec
+encrypted_session_expires 3600; # in sec
 
 location /encrypt {
     set $raw 'text to encrypted'; # from the ngx_rewrite module
