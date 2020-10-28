@@ -12,6 +12,7 @@
 
 #include "ngx_http_encrypted_session_cipher.h"
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include <stdint.h>
 
@@ -290,4 +291,22 @@ ngx_http_encrypted_session_htonll(uint64_t n)
     return ((uint64_t) htonl((unsigned long) n) << 32)
            + htonl((unsigned long) (n >> 32));
 #endif
+}
+
+unsigned char*
+ngx_http_encrypted_session_hmac(ngx_pool_t *pool,
+    const u_char *key, size_t key_len,
+    const u_char *data, size_t data_len, u_char **dst, size_t *dst_len)
+{
+    u_char *result = NULL;
+    u_char *input = ngx_pcalloc(pool, data_len + 1);
+    ngx_memcpy(input, data, data_len);
+
+    unsigned int len;
+    result = HMAC(EVP_sha256(), key, key_len, input, data_len, result, &len);
+    *dst_len = len;
+    *dst = (u_char*)ngx_pcalloc(pool, len + 1);
+    ngx_memcpy(*dst, result, len);
+
+    return *dst;
 }

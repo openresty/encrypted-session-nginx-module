@@ -5,6 +5,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 
 
 typedef int (*cipher_ctx_reset_handle) (EVP_CIPHER_CTX *ctx);
@@ -34,6 +35,10 @@ ngx_int_t ngx_http_encrypted_session_aes_mac_decrypt(
         size_t key_len, const u_char *in, size_t in_len, u_char **dst,
         size_t *dst_len);
 
+unsigned char* ngx_http_encrypted_session_hmac(
+    ngx_pool_t *pool,
+    const u_char *key, size_t key_len,
+    const u_char *data, size_t data_len, u_char **dst, size_t *dst_len);
 
 #endif /* NGX_HTTP_ENCRYPTED_SESSION_CIPHER_H */
 
