@@ -150,6 +150,26 @@ ngx_module_t  ngx_http_encrypted_session_module = {
     NGX_MODULE_V1_PADDING
 };
 
+static ngx_str_t ngx_http_get_variable_by_name(ngx_http_request_t *r,
+    unsigned char *name, ngx_http_encrypted_session_conf_t *conf)
+{
+    ngx_http_variable_value_t  *v;
+    ngx_str_t name_str;
+    name_str.data = name;
+    name_str.len = strlen((const char *)name);
+
+    ngx_uint_t key = ngx_hash_strlow(name, name, name_str.len);
+    v = ngx_http_get_variable(r, &name_str, key);
+
+    if (v->not_found) {
+        return name_str;
+    }
+
+    ngx_str_t var_value;
+    var_value.len = v->len;
+    var_value.data = v->data;
+    return var_value;
+}
 
 static ngx_int_t
 ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
@@ -176,9 +196,11 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "encrypted_session: expires=%T", conf->expires);
 
+    ngx_str_t iv = ngx_http_get_variable_by_name(r, conf->iv, conf);
+    ngx_str_t key = ngx_http_get_variable_by_name(r, conf->key, conf);
+
     rc = ngx_http_encrypted_session_aes_mac_encrypt(emcf, r->pool,
-            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
-            conf->key, ngx_http_encrypted_session_key_length,
+            r->connection->log, iv.data, iv.len, key.data, key.len,
             v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
 
     if (rc != NGX_OK) {
@@ -218,9 +240,11 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    ngx_str_t iv = ngx_http_get_variable_by_name(r, conf->iv, conf);
+    ngx_str_t key = ngx_http_get_variable_by_name(r, conf->key, conf);
+
     rc = ngx_http_encrypted_session_aes_mac_decrypt(emcf, r->pool,
-            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
-            conf->key, ngx_http_encrypted_session_key_length,
+            r->connection->log, iv.data, iv.len, key.data, key.len,
             v->data, v->len, &dst, &len);
 
     if (rc != NGX_OK) {
@@ -247,6 +271,11 @@ ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     value = cf->args->elts;
+
+    if (value[1].len > 1 && value[1].data[0] == '$') {
+      llcf->key = &(value[1].data[1]);
+      return NGX_CONF_OK;
+    }
 
     if (value[1].len != ngx_http_encrypted_session_key_length) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
@@ -275,6 +304,11 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     value = cf->args->elts;
+
+    if (value[1].len > 1 && value[1].data[0] == '$') {
+      llcf->iv = &(value[1].data[1]);
+      return NGX_CONF_OK;
+    }
 
     if (value[1].len > ngx_http_encrypted_session_iv_length) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
