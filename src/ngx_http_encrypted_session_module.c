@@ -21,13 +21,20 @@ const size_t IV_LENGTH = 16;
 const size_t SIGNATURE_LENGTH = 32;
 
 typedef struct {
-    u_char              *key;
-    size_t              key_len;
-    u_char              *iv;
-    size_t              iv_len;
-    time_t               expires;
-    ngx_flag_t          iv_in_content;
+  u_char                                        *key;
+    size_t                                      key_len;
+    u_char                                      *iv;
+    size_t                                      iv_len;
+    time_t                                      expires;
+    u_char                                      *expires_var;
+    size_t                                      expires_var_len;
+    ngx_flag_t                                  iv_in_content;
+    enum ngx_http_encrypted_session_mode        encryption_mode;
 } ngx_http_encrypted_session_conf_t;
+
+static time_t ngx_http_encrypted_session_get_expires_from_conf(
+    ngx_http_request_t *r,
+    ngx_http_encrypted_session_conf_t *conf);
 
 static ngx_int_t ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     ngx_str_t *res, ngx_http_variable_value_t *v);
@@ -42,6 +49,9 @@ static char *ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd,
 
 static char *ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
+
+static char *ngx_http_encrypted_session_mode_set(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf);
 
 static char *ngx_http_encrypted_session_expires(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
@@ -89,6 +99,15 @@ static ngx_command_t  ngx_http_encrypted_session_commands[] = {
         NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_SIF_CONF
             |NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
         ngx_http_encrypted_session_iv,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        NULL
+    },
+    {
+        ngx_string("encrypted_session_mode"),
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_SIF_CONF
+        |NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE1,
+        ngx_http_encrypted_session_mode_set,
         NGX_HTTP_LOC_CONF_OFFSET,
         0,
         NULL
@@ -183,6 +202,29 @@ static ngx_str_t ngx_http_get_variable_by_name(ngx_http_request_t *r,
     return var_value;
 }
 
+static time_t ngx_http_encrypted_session_parse_expires(ngx_str_t* value)
+{
+  return ngx_parse_time(value, 1);
+}
+
+static time_t ngx_http_encrypted_session_get_expires_from_conf(
+    ngx_http_request_t *r,
+    ngx_http_encrypted_session_conf_t *conf)
+{
+    if (!conf->expires_var) {
+        return conf->expires;
+    }
+
+    ngx_str_t expires = ngx_http_get_variable_by_name(
+        r, conf->expires_var, conf->expires_var_len, conf);
+    time_t expires_val = ngx_http_encrypted_session_parse_expires(&expires);
+    if (expires_val == NGX_ERROR) {
+        dd("expires %s has an invalid value.", conf->expires_var);
+    }
+
+    return expires_val;
+}
+
 static u_char*
 ngx_http_encrypted_session_build_payload(ngx_http_request_t *r,
     ngx_str_t *content, ngx_str_t *iv, size_t *len)
@@ -216,12 +258,28 @@ ngx_http_session_encrypted_compute_hmac(ngx_http_request_t *r,
 
 static ngx_str_t*
 ngx_http_session_generate_signature(ngx_http_request_t *r,
-    ngx_str_t *iv, ngx_str_t *key, ngx_str_t *content)
+    ngx_str_t *iv, ngx_str_t *key, ngx_str_t *content,
+    ngx_str_t *tag, enum ngx_http_encrypted_session_mode mode)
 {
     size_t signature_content_len = iv->len + content->len;
+    if (mode == ngx_http_encrypted_session_mode_gcm)
+    {
+      signature_content_len += tag->len;
+    }
+
     u_char* signature_content = (u_char*)ngx_pcalloc(r->pool, signature_content_len + 1);
     ngx_memcpy(signature_content, iv->data, iv->len);
-    ngx_memcpy(signature_content + iv->len, content->data, content->len);
+
+    if (mode == ngx_http_encrypted_session_mode_gcm)
+    {
+        ngx_memcpy(signature_content + iv->len, tag->data, tag->len);
+        ngx_memcpy(signature_content + iv->len + tag->len,
+                   content->data, content->len);
+    }
+    else
+    {
+        ngx_memcpy(signature_content + iv->len, content->data, content->len);
+    }
 
     ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                   "encrypted_session: signature content len=%d",
@@ -245,15 +303,32 @@ ngx_http_session_generate_signature(ngx_http_request_t *r,
 
 static ngx_str_t*
 ngx_http_session_generate_response_with_iv(ngx_http_request_t *r,
-    ngx_str_t *iv, ngx_str_t *key, ngx_str_t *content)
+    ngx_str_t *iv, ngx_str_t *key, ngx_str_t *content,
+    ngx_str_t *tag, enum ngx_http_encrypted_session_mode mode)
 {
-    ngx_str_t *signature = ngx_http_session_generate_signature(r, iv, key, content);
+    ngx_str_t *signature = ngx_http_session_generate_signature(r, iv, key,
+        content, tag, mode);
 
-    size_t new_len = iv->len + content->len + signature->len;
+    size_t new_len = iv->len + signature->len + content->len;
+
+    if (mode == ngx_http_encrypted_session_mode_gcm)
+    {
+        new_len += tag->len;
+    }
+
     u_char *new_content = (u_char*)ngx_pcalloc(r->pool, new_len + 1);
     ngx_memcpy(new_content, iv->data, iv->len);
     ngx_memcpy(new_content + iv->len, signature->data, signature->len);
-    ngx_memcpy(new_content + iv->len + signature->len, content->data, content->len);
+
+    if (mode == ngx_http_encrypted_session_mode_gcm)
+    {
+        ngx_memcpy(new_content + iv->len + signature->len, tag->data, tag->len);
+        ngx_memcpy(new_content + iv->len + signature->len + tag->len, content->data, content->len);
+    }
+    else
+    {
+        ngx_memcpy(new_content + iv->len + signature->len, content->data, content->len);
+    }
 
     ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                   "encrypted_session: encrypted data len=%d", content->len);
@@ -287,8 +362,17 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         return NGX_ERROR;
     }
 
+    time_t expires_val = ngx_http_encrypted_session_get_expires_from_conf(r,
+                                                                          conf);
+    if (expires_val == NGX_ERROR) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                    "encrypted_session: invalid session expires numeric value "
+                    "defined by the encrypted_session_expires directive");
+        return NGX_ERROR;
+    }
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                   "encrypted_session: expires=%T", conf->expires);
+                   "encrypted_session: expires=%T", expires_val);
 
     ngx_str_t iv = ngx_http_get_variable_by_name(r, conf->iv, conf->iv_len,
                                                  conf);
@@ -314,9 +398,12 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
                       content.data);
     }
 
+    u_char *tag;
     rc = ngx_http_encrypted_session_aes_mac_encrypt(emcf, r->pool,
             r->connection->log, iv.data, iv.len, key.data, key.len,
-            content.data, content.len, (ngx_uint_t) conf->expires, &dst, &len);
+            content.data, content.len,
+            (ngx_uint_t) expires_val,
+            conf->encryption_mode, &dst, &len, &tag);
 
     if (rc != NGX_OK) {
         res->data = NULL;
@@ -332,8 +419,12 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
         encrypted_content.len = len;
         encrypted_content.data = dst;
 
+        ngx_str_t tag_content;
+        tag_content.len = ngx_http_encrypted_session_aes_tag_size;
+        tag_content.data = tag;
+
         ngx_str_t *result = ngx_http_session_generate_response_with_iv(r, &iv,
-            &key, &encrypted_content);
+            &key, &encrypted_content, &tag_content, conf->encryption_mode);
         res->data = result->data;
         res->len = result->len;
 
@@ -377,6 +468,8 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 
     ngx_str_t iv;
     ngx_str_t content;
+    ngx_str_t tag;
+
     content.data = v->data;
     content.len = v->len;
 
@@ -405,10 +498,28 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
         u_char* signature = (u_char*)ngx_pcalloc(r->pool, SIGNATURE_LENGTH + 1);
         ngx_memcpy(signature, content.data + iv.len, SIGNATURE_LENGTH);
 
+        if (conf->encryption_mode == ngx_http_encrypted_session_mode_gcm)
+        {
+            tag.len = ngx_http_encrypted_session_aes_tag_size;
+            tag.data = (u_char*)ngx_pcalloc(r->pool, tag.len);
+            ngx_memcpy(tag.data, content.data + iv.len + SIGNATURE_LENGTH, tag.len);
+        }
+
         ngx_str_t encrypted_content;
-        encrypted_content.len = content.len - iv.len - SIGNATURE_LENGTH;
-        encrypted_content.data = (u_char*)ngx_pcalloc(r->pool, encrypted_content.len + 1);
-        ngx_memcpy(encrypted_content.data, v->data + iv.len + SIGNATURE_LENGTH, encrypted_content.len);
+        if (conf->encryption_mode == ngx_http_encrypted_session_mode_gcm)
+        {
+            encrypted_content.len = content.len - iv.len - SIGNATURE_LENGTH - tag.len;
+            encrypted_content.data = (u_char*)ngx_pcalloc(r->pool, encrypted_content.len + 1);
+            ngx_memcpy(encrypted_content.data,
+                       v->data + iv.len + SIGNATURE_LENGTH + tag.len,
+                       encrypted_content.len);
+        }
+        else
+        {
+            encrypted_content.len = content.len - iv.len - SIGNATURE_LENGTH;
+            encrypted_content.data = (u_char*)ngx_pcalloc(r->pool, encrypted_content.len + 1);
+            ngx_memcpy(encrypted_content.data, v->data + iv.len + SIGNATURE_LENGTH, encrypted_content.len);
+        }
 
         content.data = encrypted_content.data;
         content.len = encrypted_content.len;
@@ -417,7 +528,7 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
                       "encrypted_session: data len=%d", content.len);
 
         ngx_str_t *computed_signature = ngx_http_session_generate_signature(r,
-            &iv, &key, &encrypted_content);
+            &iv, &key, &encrypted_content, &tag, conf->encryption_mode);
         if (SIGNATURE_LENGTH != computed_signature->len ||
               ngx_memcmp(computed_signature->data, signature, SIGNATURE_LENGTH) != 0)
         {
@@ -432,7 +543,8 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 
     rc = ngx_http_encrypted_session_aes_mac_decrypt(emcf, r->pool,
             r->connection->log, iv.data, iv.len, key.data, key.len,
-            content.data, content.len, &dst, &len);
+            content.data, content.len, conf->encryption_mode, tag.data,
+            &dst, &len);
 
     if (rc != NGX_OK) {
         ngx_log_error(NGX_LOG_WARN, r->connection->log, 0,
@@ -542,6 +654,23 @@ ngx_http_encrypted_session_iv(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
+static char *
+ngx_http_encrypted_session_mode_set(ngx_conf_t *cf,
+    ngx_command_t *cmd, void *conf)
+{
+    ngx_str_t       *value;
+    ngx_http_encrypted_session_conf_t  *llcf = conf;
+
+    value = cf->args->elts;
+    if (value[1].len == 3 && strncmp("cbc", (char*)value[1].data, 3) == 0) {
+        llcf->encryption_mode = ngx_http_encrypted_session_mode_cbc;
+    }
+    else if (value[1].len == 3 && strncmp("gcm", (char*)value[1].data, 3) == 0) {
+        llcf->encryption_mode = ngx_http_encrypted_session_mode_gcm;
+    }
+
+    return NGX_CONF_OK;
+}
 
 static char *
 ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -556,7 +685,13 @@ ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
 
     value = cf->args->elts;
 
-    llcf->expires = ngx_parse_time(&value[1], 1);
+    if (value[1].len > 1 && value[1].data[0] == '$') {
+        llcf->expires_var = &(value[1].data[1]);
+        llcf->expires_var_len = value[1].len - 1;
+        return NGX_CONF_OK;
+    }
+
+    llcf->expires = ngx_http_encrypted_session_parse_expires(&value[1]);
 
     if (llcf->expires == NGX_ERROR) {
         return "invalid value";
@@ -653,7 +788,10 @@ ngx_http_encrypted_session_create_conf(ngx_conf_t *cf)
     conf->iv      = NGX_CONF_UNSET_PTR;
     conf->iv_len  = NGX_CONF_UNSET;
     conf->expires = NGX_CONF_UNSET;
+    conf->expires_var = NGX_CONF_UNSET_PTR;
+    conf->expires_var_len = NGX_CONF_UNSET;
     conf->iv_in_content = NGX_CONF_UNSET;
+    conf->encryption_mode = ngx_http_encrypted_session_mode_unknown;
 
     return conf;
 }
@@ -676,7 +814,19 @@ ngx_http_encrypted_session_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 
     ngx_conf_merge_value(conf->expires, prev->expires,
                          ngx_http_encrypted_session_default_expires);
+    ngx_conf_merge_size_value(conf->expires_var_len, prev->expires_var_len,
+                            (size_t)0);
+    ngx_conf_merge_ptr_value(conf->expires_var, prev->expires_var,
+                             NULL);
     ngx_conf_merge_value(conf->iv_in_content, prev->iv_in_content, 0);
+
+    if (conf->encryption_mode == ngx_http_encrypted_session_mode_unknown) {
+        conf->encryption_mode = prev->encryption_mode;
+    }
+
+    if (conf->encryption_mode == ngx_http_encrypted_session_mode_unknown) {
+        conf->encryption_mode = ngx_http_encrypted_session_mode_cbc;
+    }
 
     return NGX_CONF_OK;
 }

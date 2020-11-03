@@ -20,13 +20,28 @@
 static uint64_t ngx_http_encrypted_session_ntohll(uint64_t n);
 static uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
+const EVP_CIPHER*
+ngx_http_encrypted_session_get_cipher(enum ngx_http_encrypted_session_mode mode)
+{
+    if (mode == ngx_http_encrypted_session_mode_cbc)
+    {
+        return EVP_aes_256_cbc();
+    }
+    else if (mode == ngx_http_encrypted_session_mode_gcm)
+    {
+        return EVP_aes_256_gcm();
+    }
+
+    return NULL;
+}
 
 ngx_int_t
 ngx_http_encrypted_session_aes_mac_encrypt(
     ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
     ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
     size_t key_len, const u_char *in, size_t in_len, ngx_uint_t expires,
-    u_char **dst, size_t *dst_len)
+    enum ngx_http_encrypted_session_mode mode,
+    u_char **dst, size_t *dst_len, u_char **tag)
 {
     const EVP_CIPHER        *cipher;
     u_char                  *p, *data;
@@ -50,7 +65,10 @@ ngx_http_encrypted_session_aes_mac_encrypt(
         }
     }
 
-    cipher = EVP_aes_256_cbc();
+    cipher = ngx_http_encrypted_session_get_cipher(mode);
+    if (!cipher) {
+        goto evp_error;
+    }
 
     block_size = EVP_CIPHER_block_size(cipher);
 
@@ -107,6 +125,15 @@ ngx_http_encrypted_session_aes_mac_encrypt(
     p += len;
 
     ret = EVP_EncryptFinal(emcf->session_ctx, p, &len);
+    if (!ret) {
+        goto evp_error;
+    }
+
+    if (mode == ngx_http_encrypted_session_mode_gcm) {
+      *tag = (u_char*)ngx_pcalloc(pool, ngx_http_encrypted_session_aes_tag_size);
+      ret = EVP_CIPHER_CTX_ctrl(emcf->session_ctx, EVP_CTRL_GCM_GET_TAG,
+                                ngx_http_encrypted_session_aes_tag_size, *tag);
+    }
 
     emcf->reset_cipher_ctx(emcf->session_ctx);
 
@@ -139,8 +166,10 @@ ngx_int_t
 ngx_http_encrypted_session_aes_mac_decrypt(
     ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
     ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
-    size_t key_len, const u_char *in, size_t in_len, u_char **dst,
-    size_t *dst_len)
+    size_t key_len, const u_char *in, size_t in_len,
+    enum ngx_http_encrypted_session_mode mode,
+    u_char *tag,
+    u_char **dst, size_t *dst_len)
 {
     const EVP_CIPHER        *cipher;
     int                      ret;
@@ -171,7 +200,10 @@ ngx_http_encrypted_session_aes_mac_decrypt(
         }
     }
 
-    cipher = EVP_aes_256_cbc();
+    cipher = ngx_http_encrypted_session_get_cipher(mode);
+    if (!cipher) {
+        goto evp_error;
+    }
 
     ret = EVP_DecryptInit(emcf->session_ctx, cipher, key, iv);
     if (!ret) {
@@ -199,6 +231,14 @@ ngx_http_encrypted_session_aes_mac_decrypt(
     }
 
     p += len;
+
+    if (mode == ngx_http_encrypted_session_mode_gcm) {
+        ret = EVP_CIPHER_CTX_ctrl(emcf->session_ctx, EVP_CTRL_GCM_SET_TAG,
+            ngx_http_encrypted_session_aes_tag_size, tag);
+        if (!ret) {
+            goto evp_error;
+        }
+    }
 
     ret = EVP_DecryptFinal(emcf->session_ctx, p, &len);
 
