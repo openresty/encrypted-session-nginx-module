@@ -38,15 +38,24 @@ Synopsis
 ========
 
 ```nginx
+set $key "abcdefghijklmnopqrstuvwxyz123456";
+set $iv "1234567812345678";
+set $ses_expires "3600";
+
 # key must be of 32 bytes long
+encrypted_session_key $key;
+
 encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
 
 # iv must not be longer than 16 bytes
 #   default: "deadbeefdeadbeef" (w/o quotes)
-encrypted_session_iv "1234567812345678";
+encrypted_session_iv $iv;
+
+encrypted_session_iv_in_content; # enable this only if you rotate IV for each encryption
+encrypted_session_mode  gcm; # cbc is the default mode.
 
 # default: 1d (1 day)
-encrypted_session_expires 3600; # in sec
+encrypted_session_expires $ses_expires; # in sec
 
 location /encrypt {
     set $raw 'text to encrypted'; # from the ngx_rewrite module
