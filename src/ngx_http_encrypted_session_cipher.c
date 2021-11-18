@@ -105,7 +105,7 @@ ngx_http_encrypted_session_aes_mac_encrypt(
 
     p += len;
 
-    ret = EVP_EncryptFinal(emcf->session_ctx, p, &len);
+    ret = EVP_EncryptFinal_ex(emcf->session_ctx, p, &len);
 
     emcf->reset_cipher_ctx(emcf->session_ctx);
 
@@ -180,7 +180,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(
     block_size = EVP_CIPHER_block_size(cipher);
 
     buf_size = in_len + block_size /* for EVP_DecryptUpdate */
-               + block_size; /* for EVP_DecryptFinal */
+               + block_size; /* for EVP_DecryptFinal_ex */
 
     p = ngx_palloc(pool, buf_size);
     if (p == NULL) {
@@ -199,7 +199,7 @@ ngx_http_encrypted_session_aes_mac_decrypt(
 
     p += len;
 
-    ret = EVP_DecryptFinal(emcf->session_ctx, p, &len);
+    ret = EVP_DecryptFinal_ex(emcf->session_ctx, p, &len);
 
     emcf->reset_cipher_ctx(emcf->session_ctx);
 
