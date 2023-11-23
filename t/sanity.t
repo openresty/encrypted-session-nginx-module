@@ -316,3 +316,30 @@ X-Foo: [a-z0-9=]+$
 --- error_log
 encrypted_session: expires=1382400
 
+
+
+=== TEST 12: explicit key with default iv
+--- config
+    encrypted_session_expires 0;
+
+    location /encode {
+        set $a 'abc';
+
+		set $session_key "abcdefghijklmnopqrstuvwxyz123456";
+        set_encrypt_session_keyed $res $a $session_key;
+
+        set_encode_base32 $ppres $res;
+
+        echo "res = $ppres";
+
+        set_decrypt_session $b $res;
+        echo "b = $b";
+    }
+--- request
+    GET /encode
+--- response_body
+res = ktrp3n437q42laejppc9d4bg0jpv0ejie106ooo65od9lf5huhs0====
+b = abc
+--- error_log
+encrypted_session: expires=0
+
