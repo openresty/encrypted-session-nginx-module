@@ -23,14 +23,13 @@ env:
     - OPENSSL_PREFIX=/usr/local/openresty/openssl3
     - OPENSSL_LIB=$OPENSSL_PREFIX/lib
     - OPENSSL_INC=$OPENSSL_PREFIX/include
-    - PCRE_VER=8.45
-    - OPENSSL_PREFIX=/usr/local/openresty/pcre2
+    - PCRE_PREFIX=/usr/local/openresty/pcre2
     - PCRE_LIB=$PCRE_PREFIX/lib
     - PCRE_INC=$PCRE_PREFIX/include
     - JOBS=3
     - NGX_BUILD_JOBS=$JOBS
   matrix:
-    - NGINX_VERSION=1.31.0
+    - NGINX_VERSION=1.31.3
 
 before_install:
   - sudo apt-get install -qq -y axel cpanminus libtest-base-perl libtext-diff-perl liburi-perl libwww-perl libtest-longstring-perl liblist-moreutils-perl ca-certificates > build.log 2>&1 || (cat build.log && exit 1)
