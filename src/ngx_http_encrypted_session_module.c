@@ -31,6 +31,12 @@ static ngx_int_t ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
 static ngx_int_t ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
     ngx_str_t *res, ngx_http_variable_value_t *v);
 
+static ngx_int_t ngx_http_set_encode_encrypted_session_keyed(ngx_http_request_t *r,
+    ngx_str_t *res, ngx_http_variable_value_t *v);
+
+static ngx_int_t ngx_http_set_decode_encrypted_session_keyed(ngx_http_request_t *r,
+    ngx_str_t *res, ngx_http_variable_value_t *v);
+
 static void ngx_http_encrypted_session_free_cipher_ctx(void *data);
 
 static char *ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -68,6 +74,20 @@ static  ndk_set_var_t  ngx_http_set_decode_encrypted_session_filter = {
     NULL
 };
 
+
+static  ndk_set_var_t  ngx_http_set_encode_encrypted_session_keyed_filter = {
+    NDK_SET_VAR_MULTI_VALUE,
+    (void *) ngx_http_set_encode_encrypted_session_keyed,
+    2,
+    NULL
+};
+
+static  ndk_set_var_t  ngx_http_set_decode_encrypted_session_keyed_filter = {
+    NDK_SET_VAR_MULTI_VALUE,
+    (void *) ngx_http_set_decode_encrypted_session_keyed,
+    2,
+    NULL
+};
 
 static ngx_command_t  ngx_http_encrypted_session_commands[] = {
     {
@@ -114,6 +134,24 @@ static ngx_command_t  ngx_http_encrypted_session_commands[] = {
         NGX_HTTP_LOC_CONF_OFFSET,
         0,
         &ngx_http_set_decode_encrypted_session_filter
+    },
+    {
+        ngx_string("set_encrypt_session_keyed"),
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_SIF_CONF
+            |NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE3,
+		ndk_set_var_multi_value,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        &ngx_http_set_encode_encrypted_session_keyed_filter
+    },
+    {
+        ngx_string("set_decrypt_session_keyed"),
+        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_SIF_CONF
+            |NGX_HTTP_LOC_CONF|NGX_HTTP_LIF_CONF|NGX_CONF_TAKE3,
+		ndk_set_var_multi_value,
+        NGX_HTTP_LOC_CONF_OFFSET,
+        0,
+        &ngx_http_set_decode_encrypted_session_keyed_filter
     },
 
     ngx_null_command
@@ -195,6 +233,51 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_http_set_encode_encrypted_session_keyed(ngx_http_request_t *r,
+    ngx_str_t *res, ngx_http_variable_value_t *v)
+{
+    size_t                   len;
+    u_char                  *dst;
+    ngx_int_t                rc;
+
+    ngx_http_encrypted_session_conf_t      *conf;
+    ngx_http_encrypted_session_main_conf_t *emcf;
+
+    emcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
+    conf = ngx_http_get_module_loc_conf(r, ngx_http_encrypted_session_module);
+
+    u_char *actualKey = NULL;
+    if ((v+1)->len != ngx_http_encrypted_session_key_length) {
+        ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+            "encrypted_session_keyed: specified key needs to be exactly %d characters long; got %d",
+            ngx_http_encrypted_session_key_length, (v+1)->len);
+        return NGX_ERROR;
+    } else {
+        actualKey = (v+1)->data;
+    }
+
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
+                   "encrypted_session_keyed: expires=%T", conf->expires);
+
+    rc = ngx_http_encrypted_session_aes_mac_encrypt(emcf, r->pool,
+            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
+            actualKey, ngx_http_encrypted_session_key_length,
+            v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
+
+    if (rc != NGX_OK) {
+        dst = NULL;
+        len = 0;
+
+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
+                      "encrypted_session_keyed: failed to encrypt");
+    }
+
+    res->data = dst;
+    res->len = len;
+
+    return NGX_OK;
+}
 
 static ngx_int_t
 ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
@@ -234,6 +317,45 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
     return NGX_OK;
 }
 
+static ngx_int_t
+ngx_http_set_decode_encrypted_session_keyed(ngx_http_request_t *r,
+    ngx_str_t *res, ngx_http_variable_value_t *v)
+{
+    size_t                   len;
+    u_char                  *dst;
+    ngx_int_t                rc;
+
+    ngx_http_encrypted_session_conf_t      *conf;
+    ngx_http_encrypted_session_main_conf_t *emcf;
+
+    emcf = ngx_http_get_module_main_conf(r, ngx_http_encrypted_session_module);
+    conf = ngx_http_get_module_loc_conf(r, ngx_http_encrypted_session_module);
+
+    u_char *actualKey;
+	if ((v+1)->len != ngx_http_encrypted_session_key_length) {
+		ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+				"encrypted_session_keyed: specified key needs to be exactly %d characters long; got %d",
+				ngx_http_encrypted_session_key_length, (v+1)->len);
+		return NGX_ERROR;
+	} else {
+		actualKey = (v+1)->data;
+	}
+
+    rc = ngx_http_encrypted_session_aes_mac_decrypt(emcf, r->pool,
+            r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
+            actualKey, ngx_http_encrypted_session_key_length,
+            v->data, v->len, &dst, &len);
+
+    if (rc != NGX_OK) {
+        dst = NULL;
+        len = 0;
+    }
+
+    res->data = dst;
+    res->len = len;
+
+    return NGX_OK;
+}
 
 static char *
 ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
