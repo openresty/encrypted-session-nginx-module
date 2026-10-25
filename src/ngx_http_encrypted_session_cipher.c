@@ -12,7 +12,9 @@
 
 #include "ngx_http_encrypted_session_cipher.h"
 #include <openssl/evp.h>
-#include <openssl/md5.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#include <limits.h>
 #include <openssl/crypto.h>
 #include <stdint.h>
 
@@ -21,22 +23,60 @@ static uint64_t ngx_http_encrypted_session_ntohll(uint64_t n);
 static uint64_t ngx_http_encrypted_session_htonll(uint64_t n);
 
 
+/*
+ * Version || unpredictable IV || AES-CBC ciphertext || HMAC-SHA256.
+ * Authenticate the version and IV along with the ciphertext before decrypting.
+ * The configured IV is retained in the API for configuration compatibility.
+ */
+#define SESSION_VERSION         1
+#define SESSION_IV_SIZE         16
+#define SESSION_BLOCK_SIZE      16
+#define SESSION_HEADER_SIZE     (1 + SESSION_IV_SIZE)
+#define SESSION_MAC_SIZE        ngx_http_encrypted_session_mac_length
+
+
+ngx_int_t
+ngx_http_encrypted_session_init_key(ngx_http_encrypted_session_key_t *key,
+    const u_char *data, size_t len)
+{
+    static const u_char domain[] = "encrypted-session MAC v1";
+    unsigned int        mac_key_len;
+
+    if (len != ngx_http_encrypted_session_key_length) {
+        return NGX_ERROR;
+    }
+
+    if (HMAC(EVP_sha256(), data, (int) len, domain, sizeof(domain) - 1,
+             key->mac_key, &mac_key_len) == NULL
+        || mac_key_len != SESSION_MAC_SIZE)
+    {
+        OPENSSL_cleanse(key, sizeof(*key));
+        return NGX_ERROR;
+    }
+
+    ngx_memcpy(key->key, data, len);
+    return NGX_OK;
+}
+
+
 ngx_int_t
 ngx_http_encrypted_session_aes_mac_encrypt(
     ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
-    ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
-    size_t key_len, const u_char *in, size_t in_len, ngx_uint_t expires,
+    ngx_log_t *log, const u_char *iv, size_t iv_len,
+    const ngx_http_encrypted_session_key_t *key,
+    const u_char *in, size_t in_len, ngx_uint_t expires,
     u_char **dst, size_t *dst_len)
 {
-    const EVP_CIPHER        *cipher;
-    u_char                  *p, *data;
-    int                      ret;
-    size_t                   block_size, buf_size, data_size;
-    int                      len;
-    uint64_t                 expires_time;
-    time_t                   now;
+    u_char         *token, *data;
+    size_t          data_size, capacity, encrypted;
+    int             len, tail;
+    unsigned int    mac_len;
+    uint64_t        expires_time;
+    time_t          now;
 
-    if (key_len != ngx_http_encrypted_session_key_length) {
+    if (key == NULL
+        || in_len > INT_MAX - sizeof(expires_time) - SESSION_BLOCK_SIZE)
+    {
         return NGX_ERROR;
     }
 
@@ -50,207 +90,133 @@ ngx_http_encrypted_session_aes_mac_encrypt(
         }
     }
 
-    cipher = EVP_aes_256_cbc();
-
-    block_size = EVP_CIPHER_block_size(cipher);
-
     data_size = in_len + sizeof(expires_time);
-
-    buf_size = MD5_DIGEST_LENGTH /* for the digest */
-               + (data_size + block_size - 1) /* for EVP_EncryptUpdate */
-               + block_size; /* for EVP_EncryptFinal */
-
-    p = ngx_palloc(pool, buf_size + data_size);
-    if (p == NULL) {
-        goto evp_error;
+    capacity = SESSION_HEADER_SIZE + data_size + SESSION_BLOCK_SIZE
+               + SESSION_MAC_SIZE;
+    token = ngx_palloc(pool, capacity);
+    data = ngx_palloc(pool, data_size);
+    if (token == NULL || data == NULL) {
+        return NGX_ERROR;
     }
 
-    *dst = p;
+    token[0] = SESSION_VERSION;
+    if (RAND_bytes(token + 1, SESSION_IV_SIZE) != 1) {
+        ngx_log_error(NGX_LOG_ERR, log, 0,
+                      "encrypted_session: failed to generate session IV");
 
-    data = p + buf_size;
+        return NGX_ERROR;
+    }
 
-    ngx_memcpy(data, in, in_len);
-
-    if (expires == 0) {
-        expires_time = 0;
-    } else {
+    expires_time = 0;
+    if (expires != 0) {
         now = time(NULL);
         if (now == -1) {
-            goto evp_error;
+            return NGX_ERROR;
         }
 
         expires_time = (uint64_t) now + (uint64_t) expires;
     }
 
-    dd("expires before encryption: %lld", (long long) expires_time);
-
     expires_time = ngx_http_encrypted_session_htonll(expires_time);
+    ngx_memcpy(data, in, in_len);
+    ngx_memcpy(data + in_len, &expires_time, sizeof(expires_time));
 
-    ngx_memcpy(data + in_len, (u_char *) &expires_time, sizeof(expires_time));
-
-    MD5(data, data_size, p);
-
-    p += MD5_DIGEST_LENGTH;
-
-    ret = EVP_EncryptInit(emcf->session_ctx, cipher, key, iv);
-    if (!ret) {
-        goto evp_error;
+    if (EVP_EncryptInit_ex(emcf->session_ctx, EVP_aes_256_cbc(), NULL,
+                           key->key, token + 1) != 1
+        || EVP_EncryptUpdate(emcf->session_ctx, token + SESSION_HEADER_SIZE,
+                             &len, data, (int) data_size) != 1
+        || EVP_EncryptFinal_ex(emcf->session_ctx,
+                               token + SESSION_HEADER_SIZE + len, &tail) != 1)
+    {
+        emcf->reset_cipher_ctx(emcf->session_ctx);
+        return NGX_ERROR;
     }
-
-    /* encrypt the raw input data */
-
-    ret = EVP_EncryptUpdate(emcf->session_ctx, p, &len, data, data_size);
-    if (!ret) {
-        goto evp_error;
-    }
-
-    p += len;
-
-    ret = EVP_EncryptFinal_ex(emcf->session_ctx, p, &len);
 
     emcf->reset_cipher_ctx(emcf->session_ctx);
-
-    if (!ret) {
+    encrypted = SESSION_HEADER_SIZE + len + tail;
+    if (HMAC(EVP_sha256(), key->mac_key, SESSION_MAC_SIZE, token, encrypted,
+             token + encrypted, &mac_len) == NULL
+        || mac_len != SESSION_MAC_SIZE)
+    {
         return NGX_ERROR;
     }
 
-    p += len;
-
-    *dst_len = p - *dst;
-
-    if (*dst_len > buf_size) {
-        ngx_log_error(NGX_LOG_ERR, log, 0,
-                      "encrypted_session: aes_mac_encrypt: buffer error");
-
-        return NGX_ERROR;
-    }
-
+    *dst = token;
+    *dst_len = encrypted + SESSION_MAC_SIZE;
     return NGX_OK;
-
-evp_error:
-
-    emcf->reset_cipher_ctx(emcf->session_ctx);
-
-    return NGX_ERROR;
 }
 
 
 ngx_int_t
 ngx_http_encrypted_session_aes_mac_decrypt(
     ngx_http_encrypted_session_main_conf_t *emcf, ngx_pool_t *pool,
-    ngx_log_t *log, const u_char *iv, size_t iv_len, const u_char *key,
-    size_t key_len, const u_char *in, size_t in_len, u_char **dst,
+    ngx_log_t *log, const u_char *iv, size_t iv_len,
+    const ngx_http_encrypted_session_key_t *key,
+    const u_char *in, size_t in_len, u_char **dst,
     size_t *dst_len)
 {
-    const EVP_CIPHER        *cipher;
-    int                      ret;
-    size_t                   block_size, buf_size;
-    int                      len;
-    u_char                  *p;
-    const u_char            *digest;
-    uint64_t                 expires_time;
-    time_t                   now;
+    u_char          mac[SESSION_MAC_SIZE], *data;
+    size_t          authenticated, encrypted;
+    int             len, tail;
+    unsigned int    mac_len;
+    uint64_t        expires_time;
+    time_t          now;
 
-    u_char new_digest[MD5_DIGEST_LENGTH];
-
-    if (key_len != ngx_http_encrypted_session_key_length
-        || in_len < MD5_DIGEST_LENGTH)
+    if (key == NULL
+        || in_len < SESSION_HEADER_SIZE + SESSION_BLOCK_SIZE + SESSION_MAC_SIZE
+        || in[0] != SESSION_VERSION)
     {
         return NGX_ERROR;
     }
 
-    digest = in;
+    authenticated = in_len - SESSION_MAC_SIZE;
+    encrypted = authenticated - SESSION_HEADER_SIZE;
+    if (encrypted > INT_MAX || encrypted % SESSION_BLOCK_SIZE != 0
+        || HMAC(EVP_sha256(), key->mac_key, SESSION_MAC_SIZE, in, authenticated,
+                mac, &mac_len) == NULL
+        || mac_len != SESSION_MAC_SIZE
+        || CRYPTO_memcmp(mac, in + authenticated, SESSION_MAC_SIZE) != 0)
+    {
+        return NGX_ERROR;
+    }
 
     if (emcf->session_ctx == NULL) {
         emcf->session_ctx = EVP_CIPHER_CTX_new();
         if (emcf->session_ctx == NULL) {
             ngx_log_error(NGX_LOG_ERR, log, 0,
-                          "encrypted_session: aes_mac_encrypt: no memory");
+                          "encrypted_session: aes_mac_decrypt: no memory");
 
             return NGX_ERROR;
         }
     }
 
-    cipher = EVP_aes_256_cbc();
-
-    ret = EVP_DecryptInit(emcf->session_ctx, cipher, key, iv);
-    if (!ret) {
-        goto evp_error;
+    data = ngx_palloc(pool, encrypted);
+    if (data == NULL) {
+        return NGX_ERROR;
     }
 
-    block_size = EVP_CIPHER_block_size(cipher);
-
-    buf_size = in_len + block_size /* for EVP_DecryptUpdate */
-               + block_size; /* for EVP_DecryptFinal_ex */
-
-    p = ngx_palloc(pool, buf_size);
-    if (p == NULL) {
-        goto evp_error;
+    if (EVP_DecryptInit_ex(emcf->session_ctx, EVP_aes_256_cbc(), NULL,
+                           key->key, in + 1) != 1
+        || EVP_DecryptUpdate(emcf->session_ctx, data, &len,
+                             in + SESSION_HEADER_SIZE, (int) encrypted) != 1
+        || EVP_DecryptFinal_ex(emcf->session_ctx, data + len, &tail) != 1)
+    {
+        emcf->reset_cipher_ctx(emcf->session_ctx);
+        return NGX_ERROR;
     }
-
-    *dst = p;
-
-    ret = EVP_DecryptUpdate(emcf->session_ctx, p, &len, in + MD5_DIGEST_LENGTH,
-                            in_len - MD5_DIGEST_LENGTH);
-
-    if (!ret) {
-        dd("decrypt update failed");
-        goto evp_error;
-    }
-
-    p += len;
-
-    ret = EVP_DecryptFinal_ex(emcf->session_ctx, p, &len);
 
     emcf->reset_cipher_ctx(emcf->session_ctx);
-
-    if (!ret) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                       "failed to decrypt session: bad AES-256 digest");
-
+    if ((size_t) (len + tail) < sizeof(expires_time)) {
         return NGX_ERROR;
     }
 
-    p += len;
-
-    *dst_len = p - *dst;
-
-    if (*dst_len > buf_size) {
-        ngx_log_error(NGX_LOG_ERR, log, 0,
-                      "encrypted_session: aes_mac_decrypt: buffer error");
-
-        return NGX_ERROR;
-    }
-
-    if (*dst_len < sizeof(expires_time)) {
-        return NGX_ERROR;
-    }
-
-    MD5(*dst, *dst_len, new_digest);
-
-    if (CRYPTO_memcmp(digest, new_digest, MD5_DIGEST_LENGTH) != 0) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, log, 0,
-                       "failed to decrypt session: MD5 checksum mismatch");
-
-        return NGX_ERROR;
-    }
-
-    *dst_len -= sizeof(expires_time);
-
-    dd("dst len: %d", (int) *dst_len);
-    dd("dst: %.*s", (int) *dst_len, *dst);
-
-    p -= sizeof(expires_time);
-
-    ngx_memcpy(&expires_time, p, sizeof(expires_time));
+    *dst_len = len + tail - sizeof(expires_time);
+    ngx_memcpy(&expires_time, data + *dst_len, sizeof(expires_time));
     expires_time = ngx_http_encrypted_session_ntohll(expires_time);
-
     now = time(NULL);
     if (now == -1) {
         return NGX_ERROR;
     }
-
-    dd("expires after decryption: %lld", (long long) expires_time);
 
     if (expires_time && expires_time <= (uint64_t) now) {
         ngx_log_debug2(NGX_LOG_DEBUG_HTTP, log, 0,
@@ -259,15 +225,8 @@ ngx_http_encrypted_session_aes_mac_decrypt(
         return NGX_ERROR;
     }
 
-    dd("decrypted successfully");
-
+    *dst = data;
     return NGX_OK;
-
-evp_error:
-
-    emcf->reset_cipher_ctx(emcf->session_ctx);
-
-    return NGX_ERROR;
 }
 
 

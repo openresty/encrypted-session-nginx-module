@@ -13,6 +13,7 @@ Table of Contents
 * [Status](#status)
 * [Synopsis](#synopsis)
 * [Description](#description)
+* [Token Format Compatibility](#token-format-compatibility)
 * [Directives](#directives)
     * [encrypted_session_key](#encrypted_session_key)
     * [encrypted_session_iv](#encrypted_session_iv)
@@ -41,9 +42,7 @@ Synopsis
 # key must be of 32 bytes long
 encrypted_session_key "abcdefghijklmnopqrstuvwxyz123456";
 
-# iv must not be longer than 16 bytes
-#   default: "deadbeefdeadbeef" (w/o quotes)
-encrypted_session_iv "1234567812345678";
+# a fresh random IV is generated for every token
 
 # default: 1d (1 day)
 encrypted_session_expires 3600; # in sec
@@ -74,7 +73,10 @@ Description
 ===========
 
 This module provides encryption and decryption support for
-nginx variables based on AES-256 with Mac.
+nginx variables using AES-256-CBC and HMAC-SHA256. Each encryption uses a
+fresh cryptographically random 16-byte IV. The version, IV and ciphertext
+are authenticated before decryption with a separate MAC key derived from
+the configured encryption key.
 
 This module is usually used with the [ngx_set_misc module](http://github.com/agentzh/set-misc-nginx-module)
 and the standard rewrite module's directives.
@@ -102,6 +104,22 @@ this module's directives directly from within Lua code:
 ```lua
 local raw_text = ndk.set_var.set_decrypt_session(encrypted_text)
 ```
+
+[Back to TOC](#table-of-contents)
+
+Token Format Compatibility
+==========================
+
+Tokens contain a one-byte version (`1`), a 16-byte IV, AES-256-CBC ciphertext,
+and a 32-byte HMAC-SHA256 tag over all preceding bytes. The encrypted data
+contains the original value followed by its eight-byte big-endian expiration
+timestamp. The MAC key is derived as
+`HMAC-SHA256(encrypted_session_key, "encrypted-session MAC v1")`.
+
+The configured key must be random and secret. Legacy public-MD5, fixed-IV
+tokens are rejected; existing users must obtain new sessions after upgrading.
+All instances that exchange tokens must use the new format before issuing
+new sessions. Repeated encryptions of the same value produce different tokens.
 
 [Back to TOC](#table-of-contents)
 
@@ -134,7 +152,9 @@ encrypted_session_iv
 
 **context:** *http, server, server if, location, location if*
 
-Sets the initial vector used for the cipher (must be *no longer* than 16 bytes).
+Accepted for configuration compatibility (must be *no longer* than 16 bytes).
+This directive no longer selects the encryption IV. Every token carries its
+own randomly generated IV, and decryption uses that authenticated IV.
 
 For example,
 
@@ -365,4 +385,3 @@ See Also
 * [ngx_set_misc module](http://github.com/agentzh/set-misc-nginx-module)
 
 [Back to TOC](#table-of-contents)
-

@@ -36,9 +36,9 @@ __DATA__
     }
 --- request
     GET /encode
---- response_body
-res = ktrp3n437q42laejppc9d4bg0jpv0ejie106ooo65od9lf5huhs0====
-b = abc
+--- response_body_like
+^res = [0-9a-v=]{104}
+b = abc$
 --- error_log
 encrypted_session: expires=0
 
@@ -64,9 +64,9 @@ encrypted_session: expires=0
     }
 --- request
     GET /encode
---- response_body
-res = ktrp3n437q42laejppc9d4bg0hul4pmqhc8tn2laae40aakqfoh0====
-b = abc
+--- response_body_like
+^res = [0-9a-v=]{104}
+b = abc$
 
 
 
@@ -92,7 +92,7 @@ b = abc
 --- request
     GET /encode
 --- response_body_like
-^res = [0-9a-v=]{30,}
+^res = [0-9a-v=]{104}
 b = abc$
 --- error_log
 encrypted_session: expires=3
@@ -114,7 +114,7 @@ encrypted_session: expires=3
 --- request
     GET /encode
 --- response_body_like
-^res = [0-9a-v=]{30,}$
+^res = [0-9a-v=]{104}$
 
 
 
@@ -315,4 +315,3 @@ encrypted_session: expires=86400
 X-Foo: [a-z0-9=]+$
 --- error_log
 encrypted_session: expires=1382400
-

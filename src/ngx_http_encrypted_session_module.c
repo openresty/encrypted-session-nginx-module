@@ -10,6 +10,7 @@
 #include "ddebug.h"
 
 #include <ndk.h>
+#include <openssl/crypto.h>
 #include "ngx_http_encrypted_session_cipher.h"
 
 #define ngx_http_encrypted_session_default_iv (u_char *) "deadbeefdeadbeef"
@@ -18,9 +19,9 @@
 
 
 typedef struct {
-    u_char              *key;
-    u_char              *iv;
-    time_t               expires;
+    ngx_http_encrypted_session_key_t  *key;
+    u_char                            *iv;
+    time_t                             expires;
 
 } ngx_http_encrypted_session_conf_t;
 
@@ -32,6 +33,7 @@ static ngx_int_t ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
     ngx_str_t *res, ngx_http_variable_value_t *v);
 
 static void ngx_http_encrypted_session_free_cipher_ctx(void *data);
+static void ngx_http_encrypted_session_free_key(void *data);
 
 static char *ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
@@ -178,8 +180,7 @@ ngx_http_set_encode_encrypted_session(ngx_http_request_t *r,
 
     rc = ngx_http_encrypted_session_aes_mac_encrypt(emcf, r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
-            conf->key, ngx_http_encrypted_session_key_length,
-            v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
+            conf->key, v->data, v->len, (ngx_uint_t) conf->expires, &dst, &len);
 
     if (rc != NGX_OK) {
         dst = NULL;
@@ -220,8 +221,7 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 
     rc = ngx_http_encrypted_session_aes_mac_decrypt(emcf, r->pool,
             r->connection->log, conf->iv, ngx_http_encrypted_session_iv_length,
-            conf->key, ngx_http_encrypted_session_key_length,
-            v->data, v->len, &dst, &len);
+            conf->key, v->data, v->len, &dst, &len);
 
     if (rc != NGX_OK) {
         dst = NULL;
@@ -238,7 +238,9 @@ ngx_http_set_decode_encrypted_session(ngx_http_request_t *r,
 static char *
 ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_str_t       *value;
+    ngx_str_t                         *value;
+    ngx_pool_cleanup_t                *cln;
+    ngx_http_encrypted_session_key_t  *key;
 
     ngx_http_encrypted_session_conf_t      *llcf = conf;
 
@@ -257,7 +259,24 @@ ngx_http_encrypted_session_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    llcf->key = value[1].data;
+    cln = ngx_pool_cleanup_add(cf->pool, sizeof(*key));
+    if (cln == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    key = cln->data;
+    cln->handler = ngx_http_encrypted_session_free_key;
+
+    if (ngx_http_encrypted_session_init_key(key, value[1].data, value[1].len)
+        != NGX_OK)
+    {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "encrypted_session_key: failed to derive MAC key");
+
+        return NGX_CONF_ERROR;
+    }
+
+    llcf->key = key;
 
     return NGX_CONF_OK;
 }
@@ -324,6 +343,13 @@ ngx_http_encrypted_session_expires(ngx_conf_t *cf, ngx_command_t *cmd,
     dd("expires: %d", (int) llcf->expires);
 
     return NGX_CONF_OK;
+}
+
+
+static void
+ngx_http_encrypted_session_free_key(void *data)
+{
+    OPENSSL_cleanse(data, sizeof(ngx_http_encrypted_session_key_t));
 }
 
 
